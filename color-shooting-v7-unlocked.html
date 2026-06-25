@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🐰 いろまと！</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1a0a2e; font-family:'Hiragino Maru Gothic Pro','BIZ UDPGothic',sans-serif;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:100dvh; overflow:hidden; user-select:none; -webkit-user-select:none;
+}
+#wrap { position:relative; width:360px; max-width:100vw; background:#1a0a2e; border-radius:14px; }
+#hud {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:7px 10px; background:#2a1248; border-radius:14px 14px 0 0; color:#fff;
+}
+#hud-left { font-size:17px; font-weight:bold; color:#ffd6f0; }
+#hud-mid { display:flex; align-items:center; gap:6px; }
+#hud-right { display:flex; align-items:center; gap:5px; }
+#level-badge { background:linear-gradient(135deg,#e040fb,#7c4dff); border-radius:20px; padding:2px 9px; font-size:10px; font-weight:bold; color:#fff; }
+#diff-badge  { border-radius:20px; padding:2px 8px; font-size:10px; font-weight:bold; color:#fff; background:#2ecc71; transition:background .5s; }
+#sound-btn   { background:rgba(255,255,255,.12); border:none; border-radius:50%; width:26px; height:26px; color:#fff; font-size:13px; cursor:pointer; }
+#lives-canvas { display:block; }
+#game-canvas { display:block; width:360px; max-width:100vw; }
+#target-bar { background:#2a1248; border-radius:0 0 14px 14px; padding:9px 12px; text-align:center; color:#fff; }
+#target-label { font-size:11px; color:#c9b8ff; margin-bottom:3px; }
+#target-name  { font-size:22px; font-weight:bold; letter-spacing:2px; color:#fff; text-shadow:0 0 12px rgba(255,200,255,.8); }
+#swatch { display:inline-block; width:22px; height:22px; border-radius:50%; border:3px solid rgba(255,255,255,.4); vertical-align:middle; margin-right:8px; }
+#skill-bar-wrap { background:#221040; }
+#overlay {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(26,10,46,.93); border-radius:14px; z-index:100;
+  padding:20px; text-align:center; color:#fff; overflow-y:auto;
+}
+#overlay h1 { font-size:24px; margin-bottom:6px; }
+#overlay p  { font-size:12px; color:#c9b8ff; line-height:1.7; margin-bottom:12px; }
+.btn { background:linear-gradient(135deg,#e040fb,#7c4dff); color:#fff; border:none; border-radius:30px; padding:11px 32px; font-size:15px; font-weight:bold; cursor:pointer; margin:5px; font-family:inherit; }
+.btn.sec { background:rgba(255,255,255,.12); font-size:13px; padding:9px 22px; }
+#lv-sel { display:flex; gap:7px; flex-wrap:wrap; justify-content:center; margin-bottom:12px; }
+#lv-sel button { background:rgba(255,255,255,.1); border:2px solid rgba(255,255,255,.2); border-radius:20px; color:#fff; padding:7px 14px; font-size:12px; cursor:pointer; font-family:inherit; }
+#lv-sel button.on { background:linear-gradient(135deg,#e040fb,#7c4dff); border-color:transparent; font-weight:bold; }
+#char-sel { display:flex; gap:16px; justify-content:center; margin-bottom:12px; }
+.cbtn { background:rgba(255,255,255,.08); border:2px solid rgba(255,255,255,.2); border-radius:14px; color:#fff; padding:8px 14px; font-size:12px; cursor:pointer; font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.cbtn.on { border-color:#e040fb; background:rgba(224,64,251,.2); }
+.cbtn canvas { display:block; }
+#lvup { position:absolute; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,#FFE066,#FF9900); color:#1a0a2e; font-weight:bold; font-size:15px; border-radius:20px; padding:7px 22px; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .3s; z-index:50; top:40px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div id="hud-left">✨ <span id="score-val">0</span></div>
+    <div id="hud-mid">
+      <div id="level-badge">3級</div>
+      <div id="diff-badge">Lv1</div>
+    </div>
+    <div id="hud-right">
+      <button id="sound-btn">🔊</button>
+      <span id="carrot-hud" style="font-size:12px;letter-spacing:1px;display:none;"></span>
+      <canvas id="lives-canvas" width="72" height="24"></canvas>
+    </div>
+  </div>
+  <canvas id="game-canvas" width="360" height="500"></canvas>
+  <div id="lvup">⬆️ レベルアップ！</div>
+  <!-- スキルゲージ（タップで発動） -->
+  <div id="skill-bar" style="padding:5px 10px;background:#221040;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background 0.3s;" onclick="if(state==='playing')activateSkill();">
+    <span id="skill-icon" style="font-size:15px;">🌸</span>
+    <div style="flex:1;">
+      <div style="height:10px;background:rgba(255,255,255,0.15);border-radius:5px;overflow:hidden;">
+        <div id="skill-gauge" style="height:100%;width:0%;border-radius:5px;background:linear-gradient(90deg,#F4A7B9,#e040fb);transition:width 0.2s;"></div>
+      </div>
+    </div>
+    <span id="skill-label" style="font-size:10px;color:#c9b8ff;white-space:nowrap;">スキルゲージ</span>
+  </div>
+  <style>
+    @keyframes skillPulse {
+      0%,100%{background:rgba(224,64,251,0.15);box-shadow:0 0 0px #e040fb;}
+      50%{background:rgba(224,64,251,0.35);box-shadow:0 0 14px #e040fb;}
+    }
+    #skill-bar.ready { animation:skillPulse 0.8s ease-in-out infinite; }
+  </style>
+  <div id="target-bar">
+    <div id="target-label">🎯 この色を撃て！　タップで発射</div>
+    <div><span id="swatch"></span><span id="target-name">－</span></div>
+  </div>
+  <div id="overlay"><div id="oc" style="width:100%"></div></div>
+</div>
+<script>
+'use strict';
+// ===== CANVAS DRAW RABBITS =====
+// さくら（ピンク・立ち耳）をcanvasに直描き
+function drawSakura(c, x, y, size) {
+  const s = size / 100;
+  // 全体を少し下にオフセットして耳が切れないようにする
+  const oy = y + 8*s;
+  // 立ち耳 左
+  c.fillStyle = '#F0A0C0';
+  c.beginPath(); c.ellipse(x-16*s, oy-30*s, 9*s, 22*s, -0.17, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#F5C8D8';
+  c.beginPath(); c.ellipse(x-16*s, oy-30*s, 5*s, 16*s, -0.17, 0, Math.PI*2); c.fill();
+  // 立ち耳 右
+  c.fillStyle = '#F0A0C0';
+  c.beginPath(); c.ellipse(x+16*s, oy-30*s, 9*s, 22*s, 0.17, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#F5C8D8';
+  c.beginPath(); c.ellipse(x+16*s, oy-30*s, 5*s, 16*s, 0.17, 0, Math.PI*2); c.fill();
+  // 顔
+  c.fillStyle = '#F0A0C0';
+  c.beginPath(); c.ellipse(x, oy, 30*s, 27*s, 0, 0, Math.PI*2); c.fill();
+  // 口元
+  c.fillStyle = '#FFF0F5';
+  c.beginPath(); c.ellipse(x, oy+8*s, 15*s, 10*s, 0, 0, Math.PI*2); c.fill();
+  // 目
+  c.fillStyle = '#6B3060';
+  c.beginPath(); c.ellipse(x-10*s, oy-4*s, 6*s, 7*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+10*s, oy-4*s, 6*s, 7*s, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.6)';
+  c.beginPath(); c.ellipse(x-8*s, oy-6*s, 2*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+12*s, oy-6*s, 2*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+  // 鼻
+  c.fillStyle = '#B06090';
+  c.beginPath(); c.ellipse(x, oy+6*s, 3.5*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+  // 口
+  c.strokeStyle = '#B06090'; c.lineWidth = 1.5*s; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x-3*s, oy+10*s); c.quadraticCurveTo(x, oy+14*s, x+3*s, oy+10*s); c.stroke();
+  // ほっぺ
+  c.globalAlpha = 0.4; c.fillStyle = '#F4B8C8';
+  c.beginPath(); c.ellipse(x-15*s, oy+4*s, 6*s, 3.5*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+15*s, oy+4*s, 6*s, 3.5*s, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 1;
+}
+
+// ショコラ（チョコ・垂れ耳）をcanvasに直描き
+function drawChocolat(c, x, y, size) {
+  const s = size / 100;
+  // 垂れ耳 左
+  c.fillStyle = '#7A4018';
+  c.beginPath();
+  c.moveTo(x-24*s, y-14*s);
+  c.bezierCurveTo(x-44*s, y-18*s, x-48*s, y+20*s, x-36*s, y+32*s);
+  c.bezierCurveTo(x-24*s, y+36*s, x-16*s, y+20*s, x-16*s, y+2*s);
+  c.closePath(); c.fill();
+  c.fillStyle = '#C4884A';
+  c.beginPath();
+  c.moveTo(x-24*s, y-10*s);
+  c.bezierCurveTo(x-40*s, y-14*s, c.x=x-44*s, y+18*s, x-34*s, y+28*s);
+  c.bezierCurveTo(x-24*s, y+32*s, x-18*s, y+18*s, x-18*s, y+2*s);
+  c.closePath(); c.fill();
+  // 垂れ耳 右
+  c.fillStyle = '#7A4018';
+  c.beginPath();
+  c.moveTo(x+24*s, y-14*s);
+  c.bezierCurveTo(x+44*s, y-18*s, x+48*s, y+20*s, x+36*s, y+32*s);
+  c.bezierCurveTo(x+24*s, y+36*s, x+16*s, y+20*s, x+16*s, y+2*s);
+  c.closePath(); c.fill();
+  c.fillStyle = '#C4884A';
+  c.beginPath();
+  c.moveTo(x+24*s, y-10*s);
+  c.bezierCurveTo(x+40*s, y-14*s, x+44*s, y+18*s, x+34*s, y+28*s);
+  c.bezierCurveTo(x+24*s, y+32*s, x+18*s, y+18*s, x+18*s, y+2*s);
+  c.closePath(); c.fill();
+  // 顔外枠
+  c.fillStyle = '#7A4018';
+  c.beginPath(); c.ellipse(x, y, 34*s, 31*s, 0, 0, Math.PI*2); c.fill();
+  // 顔
+  c.fillStyle = '#C4884A';
+  c.beginPath(); c.ellipse(x, y-2*s, 32*s, 29*s, 0, 0, Math.PI*2); c.fill();
+  // 口元
+  c.fillStyle = '#DCAA74';
+  c.beginPath(); c.ellipse(x, y+12*s, 16*s, 10*s, 0, 0, Math.PI*2); c.fill();
+  // 目
+  c.fillStyle = '#3A1A08';
+  c.beginPath(); c.ellipse(x-11*s, y-4*s, 6*s, 7*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+11*s, y-4*s, 6*s, 7*s, 0, 0, Math.PI*2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.6)';
+  c.beginPath(); c.ellipse(x-9*s, y-6*s, 2*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+13*s, y-6*s, 2*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+  // 鼻
+  c.fillStyle = '#7A3A18';
+  c.beginPath(); c.ellipse(x, y+8*s, 4*s, 3*s, 0, 0, Math.PI*2); c.fill();
+  // 口
+  c.strokeStyle = '#7A3A18'; c.lineWidth = 1.5*s; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x-3*s, y+12*s); c.quadraticCurveTo(x, y+16*s, x+3*s, y+12*s); c.stroke();
+  // ひげ
+  c.strokeStyle = 'rgba(154,112,80,0.6)'; c.lineWidth = 1*s;
+  c.beginPath(); c.moveTo(x-22*s, y+9*s); c.lineTo(x-8*s, y+10*s); c.stroke();
+  c.beginPath(); c.moveTo(x-22*s, y+13*s); c.lineTo(x-8*s, y+13*s); c.stroke();
+  c.beginPath(); c.moveTo(x+8*s, y+10*s); c.lineTo(x+22*s, y+9*s); c.stroke();
+  c.beginPath(); c.moveTo(x+8*s, y+13*s); c.lineTo(x+22*s, y+13*s); c.stroke();
+  // ほっぺ
+  c.globalAlpha = 0.3;
+  c.fillStyle = '#D07040';
+  c.beginPath(); c.ellipse(x-18*s, y+10*s, 7*s, 4*s, 0, 0, Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(x+18*s, y+10*s, 7*s, 4*s, 0, 0, Math.PI*2); c.fill();
+  c.globalAlpha = 1;
+  // 蝶ネクタイ
+  c.fillStyle = '#D4A050';
+  c.beginPath(); c.moveTo(x-7*s, y+22*s); c.lineTo(x, y+26*s); c.lineTo(x+7*s, y+22*s); c.lineTo(x, y+18*s); c.closePath(); c.fill();
+  c.fillStyle = '#C49040';
+  c.beginPath(); c.ellipse(x, y+22*s, 3*s, 2.5*s, 0, 0, Math.PI*2); c.fill();
+}
+
+// ===== COLOR DATA + 豆知識 =====
+// 豆知識は著作権に配慮しオリジナル文で記述
+const TRIVIA = {
+  // 和色名
+  'さくら色':'平安時代から愛された桜の花のような淡いピンク。染色では紅染めで最も薄い色調🌸',
+  'さんごいろ':'珊瑚の中でも装飾に珍重されたピンク系の珊瑚が由来。古くから絵の具の色名にも🪸',
+  'こうばいいろ':'紅梅の花のような淡い赤みのピンク。平安貴族が冬から春にかけて愛した色🌸',
+  'しゅいろ':'硫化水銀を原料とする人造朱。天子の朱印など権威の象徴として使われた朱肉の色🔴',
+  'あかねいろ':'茜という植物の根で染めた深い赤。万葉集にも登場する日本最古の植物染料のひとつ❤️',
+  'なすこん':'茄子の実のような黒に近い深い紫。染色の色名だが近世になって流行した色名🍆',
+  'あやめいろ':'アヤメ科のハナアヤメの花の色。「あやめ」は文目（あやめ）という美しい模様から🌸',
+  'ぼたんいろ':'牡丹の花のような紫みのある鮮やかなピンク。化学染料以前の伝統色名では唯一の華やかな赤紫🌺',
+  'きなりいろ':'未加工のままの繊維の自然な色。素朴な自然志向の時代に生まれたとても新しい色名🤍',
+  'ワインレッド':'赤ワインのような紫みの赤。英語では18世紀になってから使われるようになった色名🍷',
+  'ボルドー':'フランスのボルドー産赤ワインの色。19世紀に国際的に広まった濃い赤の色名🍷',
+  'ベビーピンク':'欧米で乳幼児服の標準色として定着したソフトなピンク。化粧品のカラーラインにも多い🍬',
+  'れんがいろ':'赤レンガのような暗い黄赤。日本人がこの色名に親しんだのは明治の文明開化以降🧱',
+  'くりいろ':'栗の実の表皮のような暗い灰みの赤茶。平安時代は「落栗（おちぐり）」という色名だった🌰',
+  'やまぶきいろ':'山吹の花の鮮やかな黄色。平安文学では黄色の代表で、後に黄金の大判小判の形容にも🌼',
+  'おうどいろ':'水酸化鉄を含む天然の泥土から作る絵の具の色。英語ではイエローオーカー🎨',
+  'からしいろ':'練りからしのようなやや暗い黄色。カラシナの種を粉にして練ったもの。英語ではマスタード🌿',
+  'うぐいすいろ':'鶯の羽毛のような暗い黄緑色。江戸時代から身近な鳥の羽の色として親しまれた🐦',
+  'もえぎ':'春に芽吹く若葉のような黄緑色。平安時代以来、若々しさ・新鮮さを象徴してきた伝統色🌱',
+  'わかたけいろ':'若い竹の茎の緑を表す色名。化学染料の時代以降に生まれた比較的新しい色名🎋',
+  'まつばいろ':'松の葉のような暗い緑色。常緑の松は長寿の象徴で、正月飾りにも縁起よく使われる🌲',
+  'せいじいろ':'唐時代の中国で作られた青磁器の色。平安時代に日本に伝わり「秘色（ひそく）」と呼ばれた🏺',
+  'あさぎいろ':'青と緑の中間色。浅葱（あさぎ）の若芽のような色という意味の、明るい藍染めの色名💠',
+  'そらいろ':'晴れた空を表す色名。古くから一般的な色名として知られる。英語ではスカイブルー☁️',
+  'あいいろ':'藍染めの暗い青。神話の時代から人類最古の植物染料とされる藍が由来💙',
+  'るりいろ':'古代インドや中国で珍重された青い宝石「瑠璃」の色。平安初期に生まれた色名。おそらくラピスラズリ💎',
+  'かきつばたいろ':'アヤメ科のカキツバタの花の色。5〜6月に咲き、花汁で布を染めたことから「書きつけ花」とも🌸',
+  'ききょういろ':'桔梗の花のような青紫色の伝統的な色名。旧暦の初秋の気配を感じさせる色名のひとつ🌿',
+  'ぐんじょういろ':'群青は藍銅鉱を原料とする日本画の代表的な青色絵の具。青の集まりを意味する色名💙',
+  // 外来色名
+  'えめらるどぐりーん':'エメラルドの宝石のような緑色。19世紀半ばにクロームグリーンの絵の具の色名として定着🟢',
+  'びりじあん':'フランス人ギネが1859年に特許を取得した水酸化クロームの絵の具の色名。ラテン語の緑から🎨',
+  'たーこいずぶるー':'トルコ石として知られる宝石の青と緑の中間色。英語になったのは16世紀後半🔵',
+  'まりんぶるー':'ヨーロッパ各国の水夫や海軍従事者が着用した藍染めの制服の色。19世紀初期に流行色に🌊',
+  'しあん':'古代ギリシャ語で「暗い」を意味するcyanosが由来。印刷・カラーフィルムの減法混色の三原色のひとつ🖨️',
+  'すかいぶるー':'18世紀になって定着した空の色を表す色名。16世紀まで空の色は英語でスカイやスカイカラーと呼ばれた☁️',
+  'べびーぶるー':'欧米で乳幼児服の標準色として使われてきた色名。青は聖母マリアの色で子どもに着せたい願いが込められた👼',
+  'こばるとぶるー':'コバルトアルミン酸塩を主成分とする青が1777年に発見された。印象派の画家たちが特に恩恵を受けた色💙',
+  'ねいびーぶるー':'イギリス海軍の制服の濃い藍染めの青。日本では紺色の英語表記として19世紀から定着🚢',
+  'うるとらまりんぶるー':'ラピスラズリを粉にした貴重な着色剤。「海の彼方から渡ってきた」という意味のウルトラマリンが色名に🌊',
+  'ばいおれっと':'スミレ属の総称で、スミレの花の色を表す色名。ニュートンが虹の七色で最も波長が短い色と命名🌈',
+  'もーぶ':'人類初の化学染料を発見したイギリスの化学者パーキンが発見した紫色の染料の色。フランス語でアオイの意味🔬',
+  'らべんだー':'19世紀後半にできたラベンダーの花の色を表す色名。入浴時の香水に用いられたラテン語「洗う」が語源🌸',
+  'ぱーぷる':'語源は古代ギリシャ語。英語のパープルは10世紀頃に生まれ、古代紫の貝殻「プルプラ貝」と関係💜',
+  'まぜんた':'減法混色の三原色のひとつ。フランスでこの赤紫の合成染料が発見されたとき、イタリア統一戦争のマゼンタの戦場での勝利を記念🎨',
+  'あいぼりー':'象牙色のこと。象牙は古代ローマから装飾や工芸品に使われ、英語のアイボリーも14世紀には使用されていた🦴',
+  'ちゃこーるぐれい':'木炭・炭を意味するチャコール。黒よりわずかに灰色を感じさせる色。英語ではチャコールグレーとチャコールブラックの両方がある🪨',
+  'しるばーぐれい':'銀は白く輝くほど価値があると考えられ17世紀まで銀色をホワイトやグレーと呼んでいた。炭酸鉛の白色鉛絵の具はシルバーホワイト🪨',
+  'せぴあ':'イカが墨を出す墨汁嚢が由来の古代の絵の具の色名。ギリシャ語でラテン語を経て英語になった。古代はインクとして利用🦑',
+  'ぶろんど':'11世紀頃のフランス語の色名で、古ゲルマン語の「明るい」が語源。主に金髪を表す特殊な色名🌟',
+  'くりーむいえろー':'乳製品として広く普及しているクリームの色。中世から英仏語で色名になっていた🥛',
+  'れもんいえろー':'緑みの黄色の色名。19世紀後半にクロームイエローとカドミウムイエローの絵の具の色名から生まれた🍋',
+  'かなりや':'大西洋上のカナリア諸島が原産の鳥の羽毛のような黄色。英語の色名ができたのは18世紀の終わり頃🐦',
+  'おりーぶ':'旧約聖書にも登場するほど欧州人の生活に不可欠な植物。実の色を表す英語の色名ができたのは18世紀🫒',
+  'おりーぶぐりーん':'生の実の色のようなオリーブの色名。17世紀に初めて英語の色名になったのはオリーブグリーンだった🫒',
+  'こばるとぐりーん':'ヨーロッパの画家がこの絵の具を使えるようになったのは19世紀中頃。発見はそれ以前で18世紀末に色名が登場🎨',
+  'かーまいん':'中南米のサボテンに寄生する介殻虫コチニールから採取された動物性染料の赤。16世紀から色名に🌺',
+  'ばーみりおん':'硫化水銀を原料とする人造朱の銀朱の色。9世紀頃のアラビアの錬金術師の発見ともいわれる🔴',
+  'すかーれっと':'英語の色名としては13世紀に誕生。中世ラテン語のスカルラトゥムが語源で、日本語の緋色（ひいろ）に相当🔴',
+  'さーもんぴんく':'18世紀にできた色名。魚の切り身の色として最も特徴があるはやはり鮭の身の色が由来🐟',
+  'ちょこれーと':'コロンブスがカカオ豆をスペインにもたらしたのは1502年。ヨーロッパ人の好みになったのは17世紀後半🍫',
+  'まりーごーるど':'マリーゴールドの花のような黄みのオレンジ色。17世紀半ば頃に英米でポピュラーになった伝統色名🌻',
+  'びーじゅ':'13世紀頃のフランス語で未加工の毛織物の色を意味した。19世紀に高級な色のシンボルとして定着💎',
+  'かーきー':'19世紀半ば、インドに駐在していたイギリスの部隊がこの色の軍服を採用。現地の言葉でほこりという意味🪖',
+  'ぴーち':'英語・仏語のペッシュはどちらも桃の果肉の色を表す色名。日本語の桃色とは別の色で16世紀末頃から🍑',
+};
+
+// ===== 色彩検定3級 慣用色名 64色 =====
+// 無料：最初の20色、有料（ぴぴモード）：全64色
+// kanji: ブロックに表示する漢字混じり表記（なければnameをそのまま使用）
+const ALL_COLORS_64 = [
+  // --- 和色名（JIS慣用色名） ---
+  {name:'さくら色',    kanji:'桜色',      hex:'#FEE0E6'},
+  {name:'さんごいろ',  kanji:'珊瑚色',    hex:'#E87060'},
+  {name:'こうばいいろ',kanji:'紅梅色',    hex:'#E8637B'},
+  {name:'しゅいろ',    kanji:'朱色',      hex:'#CF5520'},
+  {name:'あかねいろ',  kanji:'茜色',      hex:'#9B3030'},
+  {name:'なすこん',    kanji:'茄子紺',    hex:'#3C2060'},
+  {name:'あやめいろ',  kanji:'菖蒲色',    hex:'#C060A0'},
+  {name:'ぼたんいろ',  kanji:'牡丹色',    hex:'#CF4F8A'},
+  {name:'きなりいろ',  kanji:'生成り色',  hex:'#FAF0DC'},
+  // --- 外来色名 ---
+  {name:'ワインレッド',kanji:null,         hex:'#802030'},
+  {name:'ボルドー',    kanji:null,         hex:'#602828'},
+  {name:'ベビーピンク',kanji:null,         hex:'#F5C0C8'},
+  // --- 和色名（続き）---
+  {name:'れんがいろ',  kanji:'煉瓦色',    hex:'#B04030'},
+  {name:'くりいろ',    kanji:'栗色',      hex:'#7B4028'},
+  {name:'やまぶきいろ',kanji:'山吹色',    hex:'#F8B500'},
+  {name:'おうどいろ',  kanji:'黄土色',    hex:'#B88A30'},
+  {name:'からしいろ',  kanji:'芥子色',    hex:'#C8A030'},
+  {name:'うぐいすいろ',kanji:'鶯色',      hex:'#787840'},
+  {name:'もえぎ',      kanji:'萌黄',      hex:'#508050'},
+  {name:'わかたけいろ',kanji:'若竹色',    hex:'#609860'},
+  // --- ここまで無料20色 ---
+  {name:'まつばいろ',  kanji:'松葉色',    hex:'#607840'},
+  {name:'せいじいろ',  kanji:'青磁色',    hex:'#A0B890'},
+  {name:'あさぎいろ',  kanji:'浅葱色',    hex:'#40A8C0'},
+  {name:'そらいろ',    kanji:'空色',      hex:'#88C0D0'},
+  {name:'あいいろ',    kanji:'藍色',      hex:'#203870'},
+  {name:'るりいろ',    kanji:'瑠璃色',    hex:'#3848A8'},
+  {name:'かきつばたいろ',kanji:'杜若色',  hex:'#604090'},
+  {name:'ききょういろ',kanji:'桔梗色',    hex:'#504898'},
+  {name:'ぐんじょういろ',kanji:'群青色',  hex:'#3050A0'},
+  // --- 外来色名 ---
+  {name:'えめらるどぐりーん',kanji:'エメラルドグリーン',hex:'#3A8050'},
+  {name:'びりじあん',  kanji:'ビリジアン', hex:'#607860'},
+  {name:'たーこいずぶるー',kanji:'ターコイズブルー',hex:'#4898A0'},
+  {name:'まりんぶるー',kanji:'マリンブルー',hex:'#203858'},
+  {name:'しあん',      kanji:'シアン',    hex:'#4098C0'},
+  {name:'すかいぶるー',kanji:'スカイブルー',hex:'#88C0D0'},
+  {name:'べびーぶるー',kanji:'ベビーブルー',hex:'#A8C8D8'},
+  {name:'こばるとぶるー',kanji:'コバルトブルー',hex:'#2840A0'},
+  {name:'ねいびーぶるー',kanji:'ネービーブルー',hex:'#182858'},
+  {name:'うるとらまりんぶるー',kanji:'ウルトラマリンブルー',hex:'#2030A0'},
+  {name:'ばいおれっと',kanji:'バイオレット',hex:'#6038A0'},
+  {name:'もーぶ',      kanji:'モーブ',    hex:'#805090'},
+  {name:'らべんだー',  kanji:'ラベンダー',hex:'#907898'},
+  {name:'ぱーぷる',    kanji:'パープル',  hex:'#703898'},
+  {name:'まぜんた',    kanji:'マゼンタ',  hex:'#C03070'},
+  {name:'あいぼりー',  kanji:'アイボリー',hex:'#F5F0D8'},
+  {name:'ちゃこーるぐれい',kanji:'チャコールグレイ',hex:'#484840'},
+  {name:'しるばーぐれい',kanji:'シルバーグレイ',hex:'#B0B0A8'},
+  {name:'せぴあ',      kanji:'セピア',    hex:'#5A3010'},
+  {name:'ぶろんど',    kanji:'ブロンド',  hex:'#C8A848'},
+  {name:'くりーむいえろー',kanji:'クリームイエロー',hex:'#F0E8B8'},
+  {name:'れもんいえろー',kanji:'レモンイエロー',hex:'#E8D840'},
+  {name:'かなりや',    kanji:'カナリヤ',  hex:'#D8C030'},
+  {name:'おりーぶ',    kanji:'オリーブ',  hex:'#706020'},
+  {name:'おりーぶぐりーん',kanji:'オリーブグリーン',hex:'#606828'},
+  {name:'こばるとぐりーん',kanji:'コバルトグリーン',hex:'#408058'},
+  {name:'かーまいん',  kanji:'カーマイン',hex:'#C02030'},
+  {name:'ばーみりおん',kanji:'バーミリオン',hex:'#CC4420'},
+  {name:'すかーれっと',kanji:'スカーレット',hex:'#C83020'},
+  {name:'さーもんぴんく',kanji:'サーモンピンク',hex:'#E8A888'},
+  {name:'ちょこれーと',kanji:'チョコレート',hex:'#4A2010'},
+  {name:'まりーごーるど',kanji:'マリーゴールド',hex:'#D8A020'},
+  {name:'びーじゅ',    kanji:'ベージュ',  hex:'#C8A878'},
+  {name:'かーきー',    kanji:'カーキー',  hex:'#888050'},
+  {name:'ぴーち',      kanji:'ピーチ',    hex:'#F0C090'},
+];
+
+// ===== 2級追加色 63色 =====
+const COLORS_2_ADD = [
+  // 和色名
+  {name:'ときいろ',     kanji:'鴇色',      hex:'#F0A0A8'},
+  {name:'からくれない',  kanji:'韓紅花',    hex:'#C83840'},
+  {name:'すおう',       kanji:'蘇芳',      hex:'#782038'},
+  {name:'えびちゃ',     kanji:'海老茶',    hex:'#702830'},
+  {name:'とびいろ',     kanji:'鳶色',      hex:'#905030'},
+  {name:'べんがらいろ', kanji:'弁柄色',    hex:'#983838'},
+  {name:'ひわだいろ',   kanji:'桧皮色',    hex:'#704030'},
+  {name:'おうに',       kanji:'黄丹',      hex:'#D06030'},
+  {name:'こはくいろ',   kanji:'琥珀色',    hex:'#C09040'},
+  {name:'たいしゃ',     kanji:'代赭',      hex:'#B07040'},
+  {name:'こうじいろ',   kanji:'柑子色',    hex:'#D88040'},
+  {name:'くちばいろ',   kanji:'朽葉色',    hex:'#C09068'},
+  {name:'うこんいろ',   kanji:'鬱金色',    hex:'#D0A830'},
+  {name:'かりやすいろ', kanji:'刈安色',    hex:'#D0C870'},
+  {name:'きはだいろ',   kanji:'黄檗色',    hex:'#D0B840'},
+  {name:'みるいろ',     kanji:'海松色',    hex:'#787840'},
+  {name:'ひわいろ',     kanji:'鶸色',      hex:'#A0B030'},
+  {name:'ときわいろ',   kanji:'常磐色',    hex:'#407840'},
+  {name:'ろくしょういろ',kanji:'緑青色',   hex:'#608060'},
+  {name:'なんどいろ',   kanji:'納戸色',    hex:'#407068'},
+  {name:'てついろ',     kanji:'鉄色',      hex:'#304840'},
+  {name:'しんばしいろ', kanji:'新橋色',    hex:'#50A090'},
+  {name:'かめのぞき',   kanji:'甕覗き',    hex:'#98C8C0'},
+  {name:'はなだいろ',   kanji:'縹色',      hex:'#3870B0'},
+  {name:'ふじいろ',     kanji:'藤色',      hex:'#8888C0'},
+  {name:'えどむらさき', kanji:'江戸紫',    hex:'#5038A0'},
+  {name:'こだいむらさき',kanji:'古代紫',   hex:'#604880'},
+  {name:'ぎんねず',     kanji:'銀鼠',      hex:'#B0B0A8'},
+  {name:'ちゃねずみ',   kanji:'茶鼠',      hex:'#909080'},
+  {name:'りきゅうねずみ',kanji:'利休鼠',   hex:'#909888'},
+  {name:'すすたけいろ', kanji:'煤竹色',    hex:'#706858'},
+];
+
+// 2級 外来色名
+const COLORS_2_FOREIGN = [
+  {name:'ローズピンク',  kanji:null, hex:'#E09090'},
+  {name:'バーガンディー',kanji:null, hex:'#502028'},
+  {name:'オールドローズ',kanji:null, hex:'#C08080'},
+  {name:'ポピーレッド',  kanji:null, hex:'#C83030'},
+  {name:'マルーン',      kanji:null, hex:'#702020'},
+  {name:'テラコッタ',    kanji:null, hex:'#B06040'},
+  {name:'バーントシェンナ',kanji:null,hex:'#A04828'},
+  {name:'ローシェンナ',  kanji:null, hex:'#B07030'},
+  {name:'タン',          kanji:null, hex:'#B08858'},
+  {name:'エクルベイジュ',kanji:null, hex:'#E0D0A0'},
+  {name:'ゴールデンイエロー',kanji:null,hex:'#D0A030'},
+  {name:'アンバー',      kanji:null, hex:'#C09040'},
+  {name:'バーントアンバー',kanji:null,hex:'#603020'},
+  {name:'ローアンバー',  kanji:null, hex:'#806828'},
+  {name:'ネープルスイエロー',kanji:null,hex:'#E0C858'},
+  {name:'ジョンブリアン',kanji:null, hex:'#E8D040'},
+  {name:'シャトルーズグリーン',kanji:null,hex:'#B0C030'},
+  {name:'グラスグリーン',kanji:null, hex:'#808040'},
+  {name:'リーフグリーン', kanji:null,hex:'#709048'},
+  {name:'アップルグリーン',kanji:null,hex:'#B0B848'},
+  {name:'ミントグリーン', kanji:null,hex:'#90B870'},
+  {name:'マラカイトグリーン',kanji:null,hex:'#408050'},
+  {name:'ボトルグリーン', kanji:null,hex:'#304830'},
+  {name:'ピーコックグリーン',kanji:null,hex:'#309078'},
+  {name:'ナイルブルー',   kanji:null,hex:'#709090'},
+  {name:'セルリアンブルー',kanji:null,hex:'#5898B8'},
+  {name:'サックスブルー', kanji:null,hex:'#607890'},
+  {name:'ミッドナイトブルー',kanji:null,hex:'#181828'},
+  {name:'ウイスタリア',   kanji:null,hex:'#8060B8'},
+  {name:'ライラック',     kanji:null,hex:'#B088C0'},
+  {name:'スレートグレイ', kanji:null,hex:'#484858'},
+  {name:'ランプブラック',  kanji:null,hex:'#181818'},
+];
+
+// 2級 全追加色（和色名＋外来色名）
+const COLORS_2_ALL = [...COLORS_2_ADD, ...COLORS_2_FOREIGN];
+
+// 2級の豆知識を追加
+Object.assign(TRIVIA, {
+  // 2級 和色名
+  'ときいろ':'トキの翼内側や風切羽のような明るいピンク。近世和装で流行した色名。トキは日本各地に生息していた🦩',
+  'からくれない':'中国から渡来した紅花染めの赤を「呉の藍（くれない）」と呼んだことが語源。平安時代から王朝貴族に愛された❤️',
+  'すおう':'インドやマレー半島原産のマメ科植物の心材が染料。奈良時代には日本に渡来していた染料の色名🌿',
+  'えびちゃ':'葡萄の古名を「えび」といい、平安時代の「えびいろ」は山葡萄の実の色。近世に海老の字が当てられた🍇',
+  'とびいろ':'トビはトンビとも呼ばれる鳥で、その羽のような赤みの茶色。鷹色に次いで古い鳥の羽からとられた色名🦅',
+  'べんがらいろ':'インド半島北東部のベンガル地方産の天然酸化鉄からつくられた赤褐色。酸化第二鉄を使った色の一般的色名として江戸時代から広く使用🔴',
+  'ひわだいろ':'ヒノキの樹皮のような茶色の色名。黒みのある蘇芳の染色の色名ともいわれる伝統的な色名🌲',
+  'おうに':'古代に皇太子の礼服として制定され現代まで続く染色の色名。紅花とクチナシで染めたオレンジ色で、長い間臣下の服色には使えない禁色だった🧡',
+  'こはくいろ':'植物の樹脂が化石になった琥珀の色。古名は赤玉または「くはく」。日本語で宝石からとられた色名は珍しい💎',
+  'たいしゃ':'天然の土から作る絵の具の原料。東洋では中国の山西省代州産の赭土（あかつち）が有名で、その酸化鉄を使った絵の具の色名🎨',
+  'こうじいろ':'コウジミカンの実の色を表す平安時代からの伝統的な色名。「こうじ」は「かんじ」の変化した語。日本語の黄赤を代表する古い色名🍊',
+  'くちばいろ':'朽ちた落ち葉のような色。赤みがあれば赤朽葉、黄みは黄朽葉、緑みは青朽葉と呼び分けた。平安中期からの色名🍂',
+  'うこんいろ':'ショウガ科の植物ウコンの根で染めた黄色。原産地の熱帯アジアでは古くから知られ日本では中世末から使われるようになった。カレー粉の原料🌿',
+  'かりやすいろ':'奈良時代から黄の染色に使われてきたイネ科の刈安草が由来。単独で黄を染めるほか、緑を染めるために藍の下染めにも利用🌾',
+  'きはだいろ':'ミカン科の樹木キハダの樹皮の内皮の黄色素を染料とした色名。防虫効果があることから奈良時代から染め紙に使われた🌿',
+  'みるいろ':'海藻の一種ミルは万葉集に詠まれるほど広く知られていた。中世以降はオリーブグリーンの色合いを表す伝統的な色名の代表🌊',
+  'ひわいろ':'黄緑色をした小鳥ヒワの羽の色から名づけられた色名。カナリヤが渡来する前は唯一の黄色い鳥だったので金翠雀色と書かれる例もある🐦',
+  'ときわいろ':'松や杉といった常緑樹の葉のような色名。常緑樹の葉が年中緑色で変わらないことから永久に変わらない色という美称🌲',
+  'ろくしょういろ':'石緑・孔雀石からつくられる緑色の色名。炭酸銅・水酸化銅を主成分とし、銅の錆のような緑色。古来絵画の緑色絵の具の代表🎨',
+  'なんどいろ':'納戸（物置部屋）の暗がりの色、納戸の幕の色など諸説あるが、大量に藍染めをしてそれを納戸にしまっておいたという説も。江戸時代の代表的な藍染めの青💠',
+  'てついろ':'焼いた鉄の肌のような暗い緑みの青をなぜか鉄色という。鉄は「くろがね」と通称されるが英語の鉄アイアンはブルーかグレー。江戸後期から🔩',
+  'しんばしいろ':'明治末から大正にかけて流行した東京・新橋の芸者衆が好んだ着物の色。ローカルな町名が色名になった珍しい例🚉',
+  'かめのぞき':'別名「のぞきいろ」。糸や布が藍がめをちょっとのぞいただけという意味で、ごく薄い藍染めの青になる☁️',
+  'はなだいろ':'藍染めの代表的な青を表す色名。縹は漂から転じた字で藍汁の中に糸がたゆたうことを表していたとされ、奈良時代からの古い色名💙',
+  'ふじいろ':'藤の花房の色からとられた明るい青紫を表す代表的な色名。平安時代から使われている伝統的な色名で清少納言の枕草子にも登場🌸',
+  'えどむらさき':'紫を染める紫草は武蔵野でよく知られていた。名物の少ない新興都市江戸では紫物の染色が江戸子の自慢の色で、獅山人の狂歌や川柳にも入っている💜',
+  'こだいむらさき':'江戸紫のような近世の紫を「今紫」、それに対して伝統的な昔ながらの紫を古代紫と称した。区別が必要としたのは今紫ができたから🔮',
+  'ぎんねず':'銀は「しろがね」と呼ばれ色の形容としては白の美称でもあった。白に近い灰色の色名になったのは江戸時代。グレイがもっていた不吉なイメージを鼠と呼ぶことで粋な流行色に変えた🐭',
+  'ちゃねずみ':'江戸時代に四十八茶百鼠として大流行した色。当時は茶気鼠（ちゃけねず）といわれた。茶色みの灰色のことで系統色名では黄赤みの灰色🍵',
+  'りきゅうねずみ':'利休色は千利休好みの色とされるが利休が自ら名づけたわけではない。後世のイメージから生まれた色名。抹茶の連想から利休は緑みのある色の修飾語となるため利休とつく色はすべて渋い緑みの色🍵',
+  'すすたけいろ':'煤けて赤黒くなった竹のような色を表す。昔は煤払いに竹を用いた。青竹や若竹より煤竹のほうが早く色名になったのは庶民生活の身近にあったから💨',
+  // 2級 外来色名
+  'ローズピンク':'紫みを帯びたピンク色のバラの花にちなむ色名。花の名からとられた英語の色名としては最古とされ、最初はレッドとピンクの両方を表していた🌹',
+  'バーガンディー':'フランスのブルゴーニュ産の赤ワインのような色を表す色名。バーガンディーはブルゴーニュの英語名。色名の誕生は1915年と新しい🍷',
+  'オールドローズ':'イギリスのビクトリア朝でもてはやされた流行色の色名。英語の色名にオールドという形容がつくと古い・昔のという連想から、くすんだグレイッシュな色になる🌹',
+  'ポピーレッド':'ポピーは日本語ではヒナゲシのこと。イギリスでは麦畑に自生するありふれた花で、その赤い花が英語の色名として選ばれた。色名になったのは1705年頃🌺',
+  'マルーン':'スペイン産の大粒の栗の名前がイタリア語でマローネ、フランス語でマロン、英語でマルーンという色名になった。英語には栗の実の表皮の色のような茶色を表すチェスタットブラウンがあるが、マルーンはそれより赤みのある色🌰',
+  'テラコッタ':'イタリア語で「焼いた土」の意味だが素焼きの陶器などの色のこともいう。テラコッタは古くから用いられていたが英語の色名に取り入れられたのは19世紀の終わり頃🏺',
+  'バーントシェンナ':'イタリアのトスカナ地方は美しい土の採掘場として昔から知られていた。その中心都市がシエナで、そこから名づけられたシエンナ土を焼いてできた赤みのある褐色絵の具がバーントシェンナ🎨',
+  'ローシェンナ':'イタリアのトスカナ地方は土の採掘場として有名。その中心都市シエナの名前で呼ばれる絵の具の原料。フレスコ画に重要な絵の具でローは「そのまま」という意味🎨',
+  'タン':'カシ・ナラなどの樹皮から採取した汁はタンニン酸を含み獣皮をなめすのに使用された。そのなめし革をタン革といい、その色がタンと呼ばれた。16世紀にはすでに英語の色名として記録されている🍂',
+  'エクルベイジュ':'エクルもベイジュもフランス語。エクルは「さらしていない」「生の」という意味。ベイジュは未加工の羊毛のような色。二つ合わせても生成りの色。それが19世紀にファッションカラーとなった💃',
+  'ゴールデンイエロー':'ルネッサンス初期の絵画では聖人を表す光輪は金粉を使った絵の具で描かれていた。盛期には黄金の輝きに黄の絵の具が使われ、16世紀頃から金色を感じさせる黄をこの名で呼ぶように🌟',
+  'アンバー':'アンバー（amber）は琥珀のこと。この色が琥珀そのものからできたわけではなく琥珀のような色のことをいう。16世紀末にはすでに英語の色名になっていた。日本の琥珀色よりはるかに古い宝石文化の違い💎',
+  'バーントアンバー':'アンバー（umber）はイタリアのウンブリア地方の英語名といわれる。トスカナと並んでウンブリアの土も色が美しく天然の顔料として西洋諸国で有名だった。その土を焼いて暗褐色にした絵の具で画家のパレットには欠かせないもの🎨',
+  'ローアンバー':'アンバー（umber）は絵の具の原料に使われるイタリアのウンブリア地方の土のこと。ローは「そのまま」という意味。その土の色あいが欧米各国でも好まれ英語の色名になった。英米では家の壁の色によく使われる🏠',
+  'ネープルスイエロー':'「ナポリの黄」という意味。ネープルスはイタリアのナポリの英語名。中世にはナポリで用いられていたといわれ、ナポリ湾岸のヴェスヴィアス火山の鉱物からつくられたと信じられていたのでこの名で知られることになった🌋',
+  'ジョンブリアン':'フランス語で「輝かしい黄色」を意味する色名。中世にナポリの黄として知られていた絵の具に代わって新しい黄の絵の具がつくられるようになり、それにこの色名が与えられた。今では鮮やかな黄を示す🌟',
+  'シャトルーズグリーン':'フランスのシャトルーズ修道院でつくられたリキュールが色名の起源。このリキュールには黄色と緑色のものがあり、その緑色のような色を表した時代よりも新しく20世紀初頭の流行色の色名🍸',
+  'グラスグリーン':'英語の色名としては最古のもののひとつ。8世紀以前にはすでに知られていたらしい。グラスは草の意味。日本語の草色は雑草の色だが英語のグラスグリーンはどうやら牧草の色らしい🌿',
+  'リーフグリーン':'リーフは葉のことで木の葉の緑という意味の色名。草色のグラスグリーンとともに自然の黄緑色を表す色名の代表。草色ほど古くはなく19世紀の新しい名称とされている🍃',
+  'アップルグリーン':'日本ではリンゴといえば赤だが英語のアップルはグリーンの色名になっている。この色名が使われ始めた頃はリンゴといえば緑だったのだろう🍏',
+  'ミントグリーン':'ミントはハッカのこと。この色はハッカの油からつくられた酒の色といわれている。西洋ハッカのペパーミントや緑ハッカのスペアミントといった色名もある。すべて20世紀初頭の色名で歴史は浅い🌿',
+  'マラカイトグリーン':'マラカイト、日本語で孔雀石と呼ばれる鉱石からつくられた緑色の色名。古代エジプトですでにこの緑色が知られていて、エジプト人が目を守るまじないにこの緑色を目のまわりに塗ったのがアイラインの始まり💚',
+  'ボトルグリーン':'酒の輸送に使われるのが樽からガラスのボトルとコルク栓に変わったのは17世紀になってから。そのボトルには緑のガラスが使用された。薬瓶などにも普及して緑色の瓶の色が色名になったのは19世紀初め🍶',
+  'ピーコックグリーン':'孔雀の羽の緑色のような色名。本来ピーコックはブルーの色名で16世紀の終わりから使用されていた。19世紀にグリーンも色名になったが、どちらで呼ぶのが正しいと決めることはできない🦚',
+  'ナイルブルー':'1880年代にナイル川の名前がつく色名が登場した。ナイルブルーが先で、その後ナイルグリーンが色名になった。ナイルが青と緑の川として美化されて記憶されたのだろう🏞️',
+  'セルリアンブルー':'16世紀に英語の色名になったセルリアンはスカイブルーの一種だった。19世紀に錫酸コバルト化合物からつくられた美しい青の絵の具が工場生産されるようになり、その色にセルリアンブルーの色名が与えられた💙',
+  'サックスブルー':'サックスはドイツ東部の州であるザクセンの英語名。「サクソン人の青」という意味。藍染めの名前として広く一般に用いられるようになり主に繊維製品のための色名となった💙',
+  'ミッドナイトブルー':'真夜中の青という意味の暗い紺色を表す商業的な色名として成功したもののひとつ。20世紀初めに登場した流行色の色名。それまでよく知られていたネービーブルーよりも暗い紺色の色名として広く用いられるようになった🌙',
+  'ウイスタリア':'ウイスタリアは藤の英語名。19世紀末にこの色の化学染料ができたために出現した色名。同じ藤の花の色を語源とする色に藤色があるが、藤色は明るい青紫。ウイスタリアは鮮やかな青紫で微妙に違う🌸',
+  'ライラック':'ライラックの花の色からとられた薄紫の色名。英語の色名として定着したのは1775年前後とされているが、この時代は紫や赤紫の化学染料がまだ発見されていない。単にライラックの花のような色という一般的な色名だったと考えられる💜',
+  'スレートグレイ':'西洋諸国で屋根の瓦として使われる粘板岩の薄板がスレート。この色名はグレイで暗い灰色を表すが、スレートのカラーにはほかにもブルー・ブラック・バイオレット・オリーブ・パープルなどいろいろバリエーションがある🏔️',
+  'ランプブラック':'人類が発見した真っ黒な黒色絵の具の原料は炭素そのもののような煤である。ランプブラックはランプの油を燃焼させてできた煤からとられた黒。炭素の黒のカーボンブラックの同類である🪔',
+});
+
+// 無料版：最初の20色のみ
+const FREE_COLORS = ALL_COLORS_64.slice(0, 20);
+// 有料版 3級：全64色
+const PAID_COLORS_3 = ALL_COLORS_64;
+// 有料版 2級：2級63色のみ
+const PAID_COLORS_2 = COLORS_2_ALL;
+// 有料版 1級：3級64色 ＋ 2級63色 ＝ 127色
+const PAID_COLORS_1 = [...ALL_COLORS_64, ...COLORS_2_ALL];
+
+// isPaid フラグ（ぴぴモード選択時にtrueになる）
+let isPaidMode = true;
+// 選択中のレベル（ぴぴモード時のみ有効）
+let selLevel = '3級';
+
+// 累積プール
+function getColorPool() {
+  if (!isPaidMode) return FREE_COLORS;
+  if (selLevel === '2級') return PAID_COLORS_2;
+  if (selLevel === '1級') return PAID_COLORS_1;
+  return PAID_COLORS_3;
+}
+
+const COLOR_POOL = {
+  '3級': FREE_COLORS,
+};
+
+// ===== DIFF LEVELS =====
+// si=スポーン間隔(フレーム)、sb=基本速度、sr=ランダム速度幅、tr=ターゲット出現率
+const DIFFS = [
+  {lv:1,label:'Lv1',col:'#2ecc71',si:160,sb:0.5,sr:0.3,tr:0.72},
+  {lv:2,label:'Lv2',col:'#f1c40f',si:135,sb:0.7,sr:0.4,tr:0.68},
+  {lv:3,label:'Lv3',col:'#e67e22',si:110,sb:0.95,sr:0.5,tr:0.65},
+  {lv:4,label:'Lv4',col:'#e74c3c',si:88, sb:1.25,sr:0.6,tr:0.62},
+  {lv:5,label:'Lv5',col:'#9b59b6',si:68, sb:1.6, sr:0.7,tr:0.59},
+  {lv:6,label:'Lv6',col:'#c0392b',si:52, sb:2.0, sr:0.8,tr:0.56},
+  {lv:7,label:'MAX',col:'#ff0066',si:40, sb:2.5, sr:0.9,tr:0.53},
+];
+const SCORE_TH = [0,150,320,540,820,1150,1600];
+function getDiff(sc) {
+  let i=0; for(let j=SCORE_TH.length-1;j>=0;j--){if(sc>=SCORE_TH[j]){i=j;break;}} return DIFFS[Math.min(i,DIFFS.length-1)];
+}
+
+// ===== SOUND =====
+let audioCtx=null, soundOn=true;
+function getAC(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+function tone(freq,type,dur,vol,delay){
+  if(!soundOn)return;
+  try{
+    const ac=getAC();
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.type=type; o.frequency.value=freq;
+    const t=ac.currentTime+(delay||0);
+    g.gain.setValueAtTime(vol||0.3,t);
+    g.gain.linearRampToValueAtTime(0,t+dur);
+    o.start(t);o.stop(t+dur+0.05);
+  }catch(e){}
+}
+function sndHit(){tone(523,'sine',.08,.25);tone(659,'sine',.08,.25,.08);tone(784,'sine',.12,.3,.16);}
+function sndCombo(n){const f=523+n*80;tone(f,'sine',.1,.3);tone(f*1.5,'sine',.1,.2,.1);}
+function sndMiss(){tone(180,'sawtooth',.15,.25);tone(120,'sawtooth',.15,.2,.1);}
+function sndLvup(){[523,659,784,1047].forEach((f,i)=>tone(f,'sine',.15,.3,i*.1));}
+function sndShoot(){tone(880,'square',.04,.06);}
+
+// ===== GAME =====
+const gc = document.getElementById('game-canvas');
+const ctx = gc.getContext('2d');
+const W=gc.width, H=gc.height;
+const lc = document.getElementById('lives-canvas');
+const lctx = lc.getContext('2d');
+
+let state='title', curChar='pipi';
+let score=0,lives=3,combo=0;
+let bullets=[],enemies=[],particles=[],stars=[];
+let carrots=[]; // にんじんアイテム
+let carrotCount=0; // 集めたにんじん本数（3本でライフ+1）
+let pipiChar={x:W/2,y:H-55,tx:W/2};
+let target=null,pool=[];
+let spawnT=0,spawnI=130,frameN=0,cooldown=0;
+let flashMsg=null,flashT=0;
+let triviaMsg=null,triviaT=0,triviaTotal=130;
+let triviaColor=null,triviaName=null,triviaTextCol='#fff';
+let prevLv=1,curLv=1;
+let shootLocked=true;
+let gameReady=false; // ターゲット確定後にスポーン許可
+
+for(let i=0;i<60;i++) stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,s:Math.random()*.5+.3});
+
+// ===== UTILS =====
+function lighten(hex,a){const n=parseInt(hex.replace('#',''),16);return`rgb(${Math.min(255,(n>>16)+a)},${Math.min(255,((n>>8)&255)+a)},${Math.min(255,(n&255)+a)})`;}
+function contrast(hex){const n=parseInt(hex.replace('#',''),16);return(.299*(n>>16)+.587*((n>>8)&255)+.114*(n&255))>140?'#1A0A2E':'#fff';}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.arcTo(x+w,y,x+w,y+r,r);c.lineTo(x+w,y+h-r);c.arcTo(x+w,y+h,x+w-r,y+h,r);c.lineTo(x+r,y+h);c.arcTo(x,y+h,x,y+h-r,r);c.lineTo(x,y+r);c.arcTo(x,y,x+r,y,r);c.closePath();}
+
+// ===== POOL =====
+function buildPool(){
+  let base = [...getColorPool()];
+  // 未習得モード（有料版）：まだ撃ち落としていない色だけに絞る
+  if(isPaidMode && unknownOnlyMode){
+    const learned = getLearnedSet(selLevel);
+    const unknown = base.filter(c => !learned.has(c.name));
+    // 未習得が3色以上あればそれだけで、少なければ全色を使う
+    base = unknown.length >= 3 ? unknown : base;
+  }
+  pool = base;
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+}
+function pickTarget(){
+  if(!pool.length)buildPool();
+  const c=pool.filter(c=>c.name!==(target&&target.name));
+  target=c[Math.floor(Math.random()*c.length)]||pool[0];
+  gameReady=true;
+  // 漢字があれば「漢字（読み）」形式で表示
+  const dispKanji = target.kanji || target.name;
+  const isKatakanaTarget = /^[ァ-ヶーa-zA-Zａ-ｚＡ-Ｚ\s]+$/.test(dispKanji);
+  const disp = (target.kanji && !isKatakanaTarget) ? `${target.kanji}（${target.name}）` : dispKanji;
+  document.getElementById('target-name').textContent=disp;
+  document.getElementById('swatch').style.background=target.hex;
+}
+
+// ===== SPAWN =====
+const LANES=[50,130,210,290];
+function getX(bw){const used=enemies.map(e=>e.x);const free=LANES.filter(lx=>used.every(ex=>Math.abs(ex-lx)>bw*.8));return free.length?free[Math.floor(Math.random()*free.length)]:LANES[Math.floor(Math.random()*LANES.length)];}
+function spawnEnemy(){
+  if(!target || !gameReady) return;
+  const d=getDiff(score);
+  const color=Math.random()<d.tr?target:(()=>{const o=pool.filter(c=>c.name!==target.name);return o.length?o[Math.floor(Math.random()*o.length)]:target;})();
+  // 表示テキスト：漢字があれば漢字、なければname
+  const dispMain = color.kanji || color.name;
+  // dispMainがカタカナなら読みがな不要（例：バイオレット、カーマイン）
+  const isKatakana = /^[ァ-ヶーa-zA-Zａ-ｚＡ-Ｚ\s]+$/.test(dispMain);
+  const dispSub = (color.kanji && !isKatakana) ? color.name : null; // 読みがな（漢字の場合のみ）
+  // ブロック幅はmainとsubの長い方に合わせる
+  const nMain = dispMain.length;
+  const nSub  = dispSub ? dispSub.length : 0;
+  const n = Math.max(nMain, nSub);
+  const fw = n<=3?72:n<=5?88:n<=7?106:n<=9?122:138;
+  const fh = dispSub ? 38 : 30;
+  const fs = nMain<=3?14:nMain<=5?13:nMain<=7?12:11;
+  enemies.push({x:getX(fw),y:-40,color,speed:d.sb+Math.random()*d.sr,w:fw,h:fh,fs,dispMain,dispSub,wobble:Math.random()*Math.PI*2,ws:(Math.random()-.5)*.05});
+}
+function spawnP(x,y,hex,n=12){for(let i=0;i<n;i++){const a=(Math.PI*2/n)*i+Math.random()*.3,sp=2+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,color:hex,life:1,decay:.04+Math.random()*.03,r:4+Math.random()*4});}}
+
+// ===== SKILL SYSTEM =====
+// さくら：フラワーシャワー（ゲージ満タンで全ターゲット消去）
+// ショコラ：スロータイム（コンボ5以上で発動、敵が遅くなる）
+let skillGauge = 0;
+const SKILL_MAX = 100;
+let skillActive = false;
+let skillTimer = 0;
+const SKILL_DURATION = 300; // スロータイム5秒
+let slowMode = false;
+let hitColors = []; // 撃ち落とした色の記録 {name, hex}
+
+function updateSkillUI() {
+  document.getElementById('skill-gauge').style.width = skillGauge + '%';
+  const ready = skillGauge >= SKILL_MAX;
+  const bar = document.getElementById('skill-bar');
+  bar.classList.toggle('ready', ready && !flowerShower && !skillActive);
+  if (curChar === 'sakura') {
+    document.getElementById('skill-icon').textContent = flowerShower ? '🌸💫' : '🌸';
+    document.getElementById('skill-label').textContent = flowerShower ? 'シャワー中！' : (ready ? '👆タップで発動！' : 'フラワーシャワー');
+    document.getElementById('skill-gauge').style.background = 'linear-gradient(90deg,#F4A7B9,#e040fb)';
+  } else {
+    document.getElementById('skill-icon').textContent = skillActive ? '⏳' : '🐰';
+    document.getElementById('skill-label').textContent = skillActive ? 'スロータイム中！' : (ready ? '👆タップで発動！' : 'スロータイム');
+    document.getElementById('skill-gauge').style.background = 'linear-gradient(90deg,#C4884A,#7A4018)';
+  }
+}
+
+// ===== CARROT SYSTEM (ぴぴ専用) =====
+let carrotSpawnTimer=0;
+const CARROT_INTERVAL=420; // 7秒ごと
+
+function spawnCarrot(){
+  if(curChar!=='pipi') return;
+  carrots.push({
+    x: 30+Math.random()*(W-60),
+    y: -20,
+    vy: 2.2+Math.random()*1.0, // 速さ控えめに
+    wobble: Math.random()*Math.PI*2,
+    size: 20, // 少し大きく当たりやすく
+  });
+}
+
+function drawCarrot(c2){
+  const x=c2.x+Math.sin(c2.wobble)*4, y=c2.y;
+  const s=c2.size;
+  ctx.save(); ctx.translate(x,y);
+  // にんじん本体
+  ctx.fillStyle='#FF8C00';
+  ctx.beginPath();
+  ctx.moveTo(0,-s*0.8);
+  ctx.bezierCurveTo(s*0.5,-s*0.8,s*0.6,s*0.5,0,s);
+  ctx.bezierCurveTo(-s*0.6,s*0.5,-s*0.5,-s*0.8,0,-s*0.8);
+  ctx.fill();
+  // 筋
+  ctx.strokeStyle='rgba(255,140,0,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,-s*0.6); ctx.lineTo(0,s*0.8); ctx.stroke();
+  // 葉っぱ
+  ctx.fillStyle='#44BB44';
+  ctx.beginPath(); ctx.ellipse(-s*0.2,-s,s*0.12,s*0.4,0.3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,-s*1.1,s*0.1,s*0.35,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(s*0.2,-s,s*0.12,s*0.4,-0.3,0,Math.PI*2); ctx.fill();
+  // キラキラ
+  ctx.fillStyle='rgba(255,255,200,0.8)';
+  ctx.beginPath(); ctx.arc(-s*0.2,-s*0.2,2,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// にんじんカウンター描画（HUDライブスキャンバスの隣に出す）
+function drawCarrotHUD(){
+  if(curChar!=='pipi') return;
+  // ライブスキャンバスの右に小さく表示
+  const el=document.getElementById('carrot-hud');
+  if(el) el.textContent='🥕'.repeat(carrotCount)+'○'.repeat(Math.max(0,3-carrotCount));
+}
+let petals = [];
+let flowerShower = false;
+let flowerTimer = 0;
+const FLOWER_DURATION = 300; // フラワーシャワー5秒
+let flowerAutoShootTimer = 0;
+
+function spawnPetal() {
+  const cols = ['#F4A7B9','#e040fb','#FFB7D5','#FF88C2','#FFD6F0','#FFC0E0'];
+  petals.push({
+    x: Math.random() * W,
+    y: -20,
+    vy: 2 + Math.random() * 2,
+    vx: (Math.random() - 0.5) * 1.5,
+    rot: Math.random() * Math.PI * 2,
+    rotV: (Math.random() - 0.5) * 0.15,
+    size: 6 + Math.random() * 8,
+    color: cols[Math.floor(Math.random() * cols.length)],
+    life: 1,
+  });
+}
+
+function drawPetal(p) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rot);
+  ctx.globalAlpha = p.life * 0.85;
+  ctx.fillStyle = p.color;
+  ctx.shadowBlur = 4; ctx.shadowColor = p.color;
+  // 花びら形（楕円4枚）
+  for (let i = 0; i < 4; i++) {
+    ctx.save();
+    ctx.rotate((Math.PI / 2) * i);
+    ctx.beginPath();
+    ctx.ellipse(0, -p.size * 0.6, p.size * 0.35, p.size * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // 中心
+  ctx.fillStyle = '#FFE066';
+  ctx.beginPath(); ctx.arc(0, 0, p.size * 0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function activateSkill() {
+  if (skillGauge < SKILL_MAX) return;
+  skillGauge = 0;
+  if (curChar === 'sakura') {
+    // フラワーシャワー：3秒間お花が降り注ぎ、自動でターゲット撃破
+    flowerShower = true;
+    flowerTimer = FLOWER_DURATION;
+    flowerAutoShootTimer = 0;
+    flash('🌸 フラワーシャワー！', '#F4A7B9');
+    tone(880,'sine',.08,.3); tone(1046,'sine',.1,.3,.08); tone(1318,'sine',.15,.3,.16);
+  } else {
+    // スロータイム：5秒間敵が半速
+    skillActive = true; slowMode = true; skillTimer = SKILL_DURATION;
+    flash('🍫 スロータイム！', '#C4884A');
+    tone(400,'sine',.2,.3); tone(300,'sine',.3,.25,.15);
+  }
+  updateSkillUI();
+}
+
+// ===== SHOOT =====
+function canShoot(){return state==='playing'&&!shootLocked&&cooldown<=0;}
+function shoot(){
+  if(!canShoot())return;
+  if (curChar === 'sakura') {
+    // さくら：ハート弾（2発同時・ピンク）
+    bullets.push({x:pipiChar.x+10,y:pipiChar.y-26,vy:-14,r:6,type:'heart',col:'#F4A7B9'});
+    bullets.push({x:pipiChar.x-6, y:pipiChar.y-20,vy:-14,r:6,type:'heart',col:'#e040fb'});
+  } else {
+    // ショコラ：星弾（1発・茶色・大きめ）
+    bullets.push({x:pipiChar.x+12,y:pipiChar.y-26,vy:-16,r:7,type:'star',col:'#D4A050'});
+  }
+  sndShoot(); cooldown = 10;
+}
+
+function drawHeart(c, x, y, r, col) {
+  c.fillStyle = col;
+  c.shadowBlur = 8; c.shadowColor = col;
+  c.beginPath();
+  c.moveTo(x, y + r*0.8);
+  c.bezierCurveTo(x - r*1.2, y - r*0.2, x - r*1.5, y - r*1.2, x, y - r*0.4);
+  c.bezierCurveTo(x + r*1.5, y - r*1.2, x + r*1.2, y - r*0.2, x, y + r*0.8);
+  c.fill(); c.shadowBlur = 0;
+}
+
+function drawStar(c, x, y, r, col) {
+  c.fillStyle = col;
+  c.shadowBlur = 10; c.shadowColor = col;
+  c.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = (Math.PI*2/5)*i - Math.PI/2;
+    if(i===0) c.moveTo(x+Math.cos(a)*r, y+Math.sin(a)*r);
+    else c.lineTo(x+Math.cos(a)*r, y+Math.sin(a)*r);
+    c.lineTo(x+Math.cos(a+Math.PI/5)*r*.4, y+Math.sin(a+Math.PI/5)*r*.4);
+  }
+  c.closePath(); c.fill(); c.shadowBlur = 0;
+}
+function drawLives(){
+  lctx.clearRect(0,0,lc.width,lc.height);
+  const draw=curChar==='sakura'?drawSakura:drawChocolat;
+  for(let i=0;i<3;i++){lctx.globalAlpha=i<lives?1:.22;draw(lctx,12+i*24,12,22);}
+  lctx.globalAlpha=1;
+}
+
+// ===== DRAW =====
+function drawStars(){stars.forEach(s=>{ctx.globalAlpha=(.6+.4*Math.sin(frameN*s.s*.05))*.7;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;}
+
+function drawChar(x,y,size){
+  const draw=curChar==='sakura'?drawSakura:drawChocolat;
+  draw(ctx,x,y-size*.4,size);
+  // 杖
+  ctx.strokeStyle='#9B6FD4';ctx.lineWidth=3;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x+size*.12,y-size*.46);ctx.lineTo(x+size*.36,y-size*.72);ctx.stroke();
+  const wx=x+size*.36,wy=y-size*.72;
+  ctx.fillStyle='#FFE066';ctx.beginPath();
+  for(let i=0;i<5;i++){const a=(Math.PI*2/5)*i-Math.PI/2+Math.sin(frameN*.1)*.2;if(i===0)ctx.moveTo(wx+Math.cos(a)*5,wy+Math.sin(a)*5);else ctx.lineTo(wx+Math.cos(a)*5,wy+Math.sin(a)*5);ctx.lineTo(wx+Math.cos(a+Math.PI/5)*2,wy+Math.sin(a+Math.PI/5)*2);}
+  ctx.closePath();ctx.fill();
+}
+
+function drawEnemy(e){
+  const wx=e.x+Math.sin(e.wobble)*5,y=e.y;
+  const grad=ctx.createLinearGradient(wx-e.w/2,y-e.h/2,wx+e.w/2,y+e.h/2);
+  grad.addColorStop(0,lighten(e.color.hex,30));grad.addColorStop(1,e.color.hex);
+  ctx.fillStyle=grad; rr(ctx,wx-e.w/2,y-e.h/2,e.w,e.h,12); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.15)';ctx.lineWidth=1;ctx.stroke();
+  const tc=contrast(e.color.hex);
+  if(e.dispSub){
+    // 漢字（大）＋読み（小）の2行
+    ctx.fillStyle=tc;
+    ctx.font=`bold ${e.fs+1}px 'Hiragino Maru Gothic Pro',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(e.dispMain,wx,y-7);
+    ctx.font=`${e.fs-2}px 'Hiragino Maru Gothic Pro',sans-serif`;
+    ctx.globalAlpha=0.75;
+    ctx.fillText(e.dispSub,wx,y+9);
+    ctx.globalAlpha=1;
+  } else {
+    ctx.fillStyle=tc;
+    ctx.font=`bold ${e.fs}px 'Hiragino Maru Gothic Pro',sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(e.dispMain,wx,y);
+  }
+}
+
+// ===== UPDATE =====
+function update(){
+  if(state!=='playing')return;
+  frameN++;
+  pipiChar.x+=(pipiChar.tx-pipiChar.x)*.15;
+  if(cooldown>0)cooldown--;
+  // フラワーシャワー処理
+  if(flowerShower){
+    flowerTimer--;
+    // 花びらを大量生成
+    if(frameN % 3 === 0) spawnPetal();
+    // 一定間隔で画面上の全ての色を自動撃破（ターゲット関係なく全部得点）
+    flowerAutoShootTimer++;
+    if(flowerAutoShootTimer >= 18){
+      flowerAutoShootTimer = 0;
+      if(enemies.length > 0){
+        const e = enemies[0];
+        spawnP(e.x, e.y, '#F4A7B9', 20);
+        score += 10;
+        if(!hitColors.find(h=>h.name===e.color.name)) hitColors.push({name:e.color.name,kanji:e.color.kanji,hex:e.color.hex});
+        enemies.splice(0,1);
+        tone(880,'sine',.05,.2); tone(1046,'sine',.06,.2,.05);
+      }
+    }
+    // 花びら更新
+    petals.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.rot+=p.rotV; p.life-=0.008; });
+    petals=petals.filter(p=>p.life>0&&p.y<H+30);
+    if(flowerTimer<=0){
+      flowerShower=false; petals=[];
+      pickTarget(); // シャワー後にターゲットを更新
+      updateSkillUI();
+    }
+  }
+  // スキルタイマー（ショコラ・スロータイム）
+  if(skillActive && skillTimer > 0) {
+    skillTimer--;
+    if(skillTimer <= 0) { skillActive=false; slowMode=false; updateSkillUI(); }
+  }
+  const d=getDiff(score);
+  if(d.lv!==prevLv){
+    prevLv=d.lv;curLv=d.lv;
+    document.getElementById('diff-badge').textContent=d.label;
+    document.getElementById('diff-badge').style.background=d.col;
+    spawnI=d.si;
+    if(d.lv>1){sndLvup();showLvup(d.label);}
+  }
+  spawnT++;if(spawnT>=spawnI){spawnEnemy();spawnT=0;}
+
+  // にんじんスポーン（ぴぴ専用・一定間隔）
+  if(curChar==='pipi'){
+    carrotSpawnTimer++;
+    if(carrotSpawnTimer>=CARROT_INTERVAL){spawnCarrot();carrotSpawnTimer=0;}
+    // にんじん移動
+    carrots.forEach(c2=>{c2.y+=c2.vy;c2.wobble+=0.06;});
+    carrots=carrots.filter(c2=>c2.y<H+30);
+    // 弾とにんじんの当たり判定
+    for(let bi=bullets.length-1;bi>=0;bi--){
+      const b=bullets[bi];
+      for(let ci=carrots.length-1;ci>=0;ci--){
+        const c2=carrots[ci];
+        const cx=c2.x+Math.sin(c2.wobble)*4;
+        if(Math.abs(b.x-cx)<c2.size&&Math.abs(b.y-c2.y)<c2.size*1.5){
+          bullets.splice(bi,1);
+          carrots.splice(ci,1);
+          carrotCount++;
+          spawnP(cx,c2.y,'#FF8C00',10);
+          if(carrotCount>=3){
+            carrotCount=0;
+            lives=Math.min(lives+1,5); // 最大5ライフ
+            flash('🥕🥕🥕 ライフ+1！','#FF8C00');
+            tone(523,'sine',.08,.3);tone(659,'sine',.08,.3,.08);tone(784,'sine',.1,.3,.16);tone(1046,'sine',.15,.3,.24);
+            drawLives();
+          } else {
+            flash(`🥕 ×${carrotCount}`,'#FF8C00');
+            tone(660,'sine',.1,.25);
+          }
+          drawCarrotHUD();
+          break;
+        }
+      }
+    }
+    drawCarrotHUD();
+  }
+  bullets.forEach(b=>b.y+=b.vy);
+  bullets=bullets.filter(b=>b.y>-20);
+  enemies.forEach(e=>{e.y+=e.speed*((slowMode||triviaT>0)?0.25:1);e.wobble+=e.ws;});
+  // hit
+  for(let bi=bullets.length-1;bi>=0;bi--){
+    const b=bullets[bi];
+    for(let ei=enemies.length-1;ei>=0;ei--){
+      const e=enemies[ei];
+      if(Math.abs(b.x-e.x)<e.w/2&&Math.abs(b.y-e.y)<e.h/2){
+        bullets.splice(bi,1);
+        if(flowerShower){
+          // フラワーシャワー中は全色得点・ペナルティなし
+          score+=10;
+          if(!hitColors.find(h=>h.name===e.color.name)) hitColors.push({name:e.color.name,kanji:e.color.kanji,hex:e.color.hex});
+          spawnP(e.x,e.y,'#F4A7B9',16);
+          flash('+10 🌸','#F4A7B9');
+          sndHit();
+          enemies.splice(ei,1);
+        } else if(target&&e.color.name===target.name){
+          combo++;const gain=10*Math.min(combo,5);score+=gain;
+          // 撃ち落とした色を記録（重複なし）
+          if(!hitColors.find(h=>h.name===e.color.name)) hitColors.push({name:e.color.name,kanji:e.color.kanji,hex:e.color.hex});
+          spawnP(e.x,e.y,e.color.hex,16);
+          flash(`+${gain}${combo>1?'　🔥×'+combo:'　✨'}`,'#FFE066');
+          // 豆知識
+          const tv=TRIVIA[e.color.name];
+          if(tv){
+            triviaMsg=tv; triviaT=triviaTotal=150;
+            triviaColor=e.color.hex; triviaName=e.color.kanji || e.color.name;
+            triviaTextCol=contrast(e.color.hex);
+          }
+          sndHit();if(combo>1)sndCombo(combo);
+          // スキルゲージ上昇
+          skillGauge = Math.min(SKILL_MAX, skillGauge + (curChar==='sakura'?12:18));
+          // ショコラ：コンボ5でゲージ満タン
+          if(curChar==='pipi' && combo>=5) skillGauge = SKILL_MAX;
+          updateSkillUI();
+          enemies.splice(ei,1);setTimeout(pickTarget,180);
+        }else{
+          combo=0;lives--;spawnP(e.x,e.y,'#FF4466',12);
+          flash('ちがう色！💦','#FF88AA');sndMiss();
+          // ミスでゲージ少し減る
+          skillGauge = Math.max(0, skillGauge - 20); updateSkillUI();
+          enemies.splice(ei,1);drawLives();
+          if(lives<=0){endGame();return;}
+        }
+        break;
+      }
+    }
+  }
+  // off screen
+  for(let ei=enemies.length-1;ei>=0;ei--){
+    const e=enemies[ei];
+    if(e.y>H+30){
+      if(target&&e.color.name===target.name){
+        combo=0;lives--;flash('のがした！','#FF88AA');sndMiss();drawLives();
+        if(lives<=0){endGame();return;}pickTarget();
+      }
+      enemies.splice(ei,1);
+    }
+  }
+  particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.life-=p.decay;});
+  particles=particles.filter(p=>p.life>0);
+  if(flashT>0)flashT--;
+  if(triviaT>0)triviaT--;
+  document.getElementById('score-val').textContent=score;
+}
+
+function flash(txt,col){flashMsg={txt,col};flashT=40;}
+function showLvup(label){
+  const el=document.getElementById('lvup');
+  el.textContent=`⬆️ ${label} レベルアップ！`;el.style.opacity='1';
+  setTimeout(()=>el.style.opacity='0',2000);
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#1a0a2e');bg.addColorStop(.5,'#2d1b5e');bg.addColorStop(1,'#1a0a2e');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  drawStars();
+  if(state==='playing'){
+    particles.forEach(p=>{ctx.globalAlpha=p.life;ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;});
+    enemies.forEach(drawEnemy);
+    // にんじん描画（ぴぴ専用）
+    if(curChar==='pipi') carrots.forEach(drawCarrot);
+    bullets.forEach(b=>{
+      if(b.type==='heart') drawHeart(ctx,b.x,b.y,b.r,b.col);
+      else if(b.type==='star') drawStar(ctx,b.x,b.y,b.r,b.col);
+      else { ctx.fillStyle='#FFE066';ctx.shadowBlur=10;ctx.shadowColor='#E040FB';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0; }
+    });
+    drawChar(pipiChar.x,pipiChar.y,52);
+    // フラワーシャワー演出
+    if(flowerShower){
+      ctx.globalAlpha=0.06+0.03*Math.sin(frameN*.15);
+      ctx.fillStyle='#F4A7B9';
+      ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=1;
+      petals.forEach(drawPetal);
+      // SKILL発動テキスト
+      ctx.globalAlpha=0.7+0.3*Math.sin(frameN*.2);
+      ctx.font='bold 14px Hiragino Maru Gothic Pro,sans-serif';
+      ctx.fillStyle='#FF88C2';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🌸 フラワーシャワー中！', W/2, 30);
+      ctx.globalAlpha=1;
+    }
+    if(slowMode){
+      ctx.globalAlpha=0.08+0.04*Math.sin(frameN*.1);
+      ctx.fillStyle='#88CCFF';
+      ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=1;
+    }
+    if(flashT>0&&flashMsg){ctx.globalAlpha=flashT/40;ctx.font='bold 19px Hiragino Maru Gothic Pro,sans-serif';ctx.fillStyle=flashMsg.col;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(flashMsg.txt,W/2,H/2-120);ctx.globalAlpha=1;}
+    // 豆知識カード（画面中央に大きく）
+    if(triviaT>0&&triviaMsg&&triviaColor){
+      const fadeIn=100, fadeOut=20;
+      const alpha = triviaT>triviaTotal-fadeIn
+        ? (triviaTotal-triviaT)/fadeIn
+        : triviaT<fadeOut ? triviaT/fadeOut : 1;
+      ctx.globalAlpha=alpha;
+
+      const cx=W/2, cy=H/2;
+      const cw=W-40;
+
+      // 説明文の行数を先に計算してカード高さを決定
+      ctx.font='14px Hiragino Maru Gothic Pro,sans-serif';
+      const maxW=cw-36;
+      const lines=[];
+      let line='';
+      for(const ch2 of triviaMsg){
+        const test=line+ch2;
+        if(ctx.measureText(test).width>maxW){lines.push(line);line=ch2;}
+        else line=test;
+      }
+      if(line)lines.push(line);
+      const lineH=22;
+      const ch=Math.max(170, 100 + lines.length*lineH + 20);
+
+      // 暗いオーバーレイ
+      ctx.fillStyle='rgba(10,5,20,0.72)';
+      ctx.fillRect(0,0,W,H);
+
+      // カード背景
+      ctx.shadowBlur=24; ctx.shadowColor=triviaColor;
+      ctx.fillStyle='rgba(22,12,44,0.96)';
+      rr(ctx,cx-cw/2,cy-ch/2,cw,ch,20); ctx.fill();
+      ctx.shadowBlur=0;
+
+      // カードの上部：色のスウォッチ帯
+      ctx.fillStyle=triviaColor;
+      rr(ctx,cx-cw/2,cy-ch/2,cw,56,20); ctx.fill();
+      // 下角を四角に揃える
+      ctx.fillRect(cx-cw/2,cy-ch/2+36,cw,20);
+
+      // 色名（大きく）
+      ctx.fillStyle=triviaTextCol;
+      ctx.font='bold 26px Hiragino Maru Gothic Pro,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(triviaName, cx, cy-ch/2+28);
+
+      // 仕切り線
+      ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(cx-cw/2+16,cy-ch/2+60); ctx.lineTo(cx+cw/2-16,cy-ch/2+60); ctx.stroke();
+
+      // 📖 豆知識ラベル
+      ctx.fillStyle='#FFE066';
+      ctx.font='bold 11px Hiragino Maru Gothic Pro,sans-serif';
+      ctx.fillText('📖 豆知識', cx, cy-ch/2+76);
+
+      // 説明文（折り返し・事前計算済み）
+      ctx.fillStyle='#F0E8FF';
+      ctx.font='14px Hiragino Maru Gothic Pro,sans-serif';
+      const startY=cy-ch/2+100;
+      lines.forEach((l,i)=>ctx.fillText(l,cx,startY+i*lineH));
+
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+// ===== OVERLAY =====
+function showPipiNotice() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(6,2,18,0.93);z-index:9999;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Hiragino Maru Gothic Pro','BIZ UDPGothic',sans-serif;
+    padding:16px;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    position:relative;
+    background:linear-gradient(160deg,#1a0838,#2a1060,#1a0838);
+    border-radius:26px;width:100%;max-width:320px;
+    text-align:center;color:#fff;overflow:hidden;
+    box-shadow:0 0 0 1.5px rgba(224,64,251,0.6), 0 0 50px rgba(224,64,251,0.3), 0 0 100px rgba(120,60,220,0.2);
+  `;
+
+  // ヘッダー部（グラデ帯）
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background:linear-gradient(135deg,#8B00CC,#e040fb,#7c4dff);
+    padding:20px 20px 16px;
+    position:relative;
+  `;
+  // ぴぴcanvas（ヘッダー内）
+  const pipiC = document.createElement('canvas');
+  pipiC.width=72; pipiC.height=72;
+  pipiC.style.cssText='display:block;margin:0 auto 6px;filter:drop-shadow(0 0 10px rgba(255,200,255,0.8));';
+  drawChocolat(pipiC.getContext('2d'),36,36,72);
+  header.appendChild(pipiC);
+
+  const htitle = document.createElement('div');
+  htitle.style.cssText='font-size:19px;font-weight:bold;color:#fff;letter-spacing:1px;text-shadow:0 0 14px rgba(255,200,255,0.9);';
+  htitle.textContent='ぴぴモード';
+  header.appendChild(htitle);
+
+  const hsub = document.createElement('div');
+  hsub.style.cssText='font-size:11px;color:rgba(255,240,255,0.8);margin-top:3px;';
+  hsub.textContent='慣用色名 フルパック解放！';
+  header.appendChild(hsub);
+  box.appendChild(header);
+
+  // ボディ
+  const body = document.createElement('div');
+  body.style.cssText='padding:18px 18px 20px;';
+
+  // 色数カード（3段）
+  const levels = [
+    {grade:'3級', count:'64色',  free:'（無料は20色）', col1:'#2ecc71', col2:'#27ae60', icon:'🌸'},
+    {grade:'2級', count:'63色',  free:'2級のみ',        col1:'#e040fb', col2:'#7c4dff', icon:'✨'},
+    {grade:'1級', count:'127色', free:'3級＋2級',       col1:'#FFB800', col2:'#FF6600', icon:'👑'},
+  ];
+  levels.forEach(lv=>{
+    const card = document.createElement('div');
+    card.style.cssText = `
+      display:flex;align-items:center;gap:10px;
+      background:linear-gradient(90deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));
+      border:1px solid rgba(255,255,255,0.12);
+      border-left:3px solid ${lv.col1};
+      border-radius:12px;padding:9px 12px;margin-bottom:8px;text-align:left;
+    `;
+    card.innerHTML = `
+      <span style="font-size:20px;">${lv.icon}</span>
+      <div style="flex:1;">
+        <span style="font-size:13px;font-weight:bold;color:#fff;">${lv.grade}</span>
+        <span style="font-size:10px;color:rgba(255,255,255,0.5);margin-left:6px;">${lv.free}</span>
+      </div>
+      <span style="font-size:17px;font-weight:bold;background:linear-gradient(90deg,${lv.col1},${lv.col2});-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${lv.count}</span>
+    `;
+    body.appendChild(card);
+  });
+
+  // 説明文
+  const desc = document.createElement('div');
+  desc.style.cssText=`
+    background:rgba(224,64,251,0.08);border:1px solid rgba(224,64,251,0.25);
+    border-radius:12px;padding:10px 12px;margin:12px 0 14px;
+    font-size:12px;color:#d0c0f0;line-height:1.85;
+  `;
+  desc.innerHTML=`📝 <strong style="color:#FFE066;">note</strong> のぴぴモード付き記事を購入すると<br>このゲームのすべての色が解放されます✨<br><span style="color:#a89bcf;font-size:11px;">豆知識カード付き・シューティングで楽しく暗記！</span>`;
+  body.appendChild(desc);
+
+  // CTAボタン
+  const cta = document.createElement('a');
+  cta.href='https://note.com/color_studio';
+  cta.target='_blank';
+  cta.style.cssText=`
+    display:block;
+    background:linear-gradient(135deg,#FF6600,#FFB800,#e040fb);
+    background-size:200% 200%;
+    color:#fff;border-radius:24px;
+    padding:13px 20px;font-size:14px;font-weight:bold;
+    text-decoration:none;margin-bottom:10px;
+    box-shadow:0 4px 20px rgba(224,64,251,0.45);
+    letter-spacing:0.5px;
+  `;
+  cta.textContent='👉 noteで購入する';
+  body.appendChild(cta);
+
+  // 閉じるボタン
+  const closeBtn = document.createElement('button');
+  closeBtn.id='pipi-close';
+  closeBtn.style.cssText=`
+    background:rgba(255,255,255,0.09);color:#b0a0d0;border:1px solid rgba(255,255,255,0.15);
+    border-radius:20px;padding:8px 28px;font-size:12px;cursor:pointer;font-family:inherit;
+  `;
+  closeBtn.textContent='とじる';
+  body.appendChild(closeBtn);
+
+  box.appendChild(body);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  closeBtn.addEventListener('click', ()=>document.body.removeChild(overlay));
+}
+
+function unlockPipiMode() {
+  isPaidMode = true;
+  curChar = 'pipi';
+  selLevel = '3級'; // デフォルトは3級からスタート
+  document.querySelectorAll('.cbtn').forEach(b=>b.classList.remove('on'));
+  const pb = document.getElementById('cb-pipi');
+  if(pb) pb.classList.add('on');
+  // バッジ更新
+  const badge = document.getElementById('level-badge');
+  if(badge) badge.textContent = selLevel+'★';
+  drawLives(); updateSkillUI();
+  // ぴぴモード解放アナウンス
+  const ov2 = document.createElement('div');
+  ov2.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,4,24,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:inherit;';
+  ov2.innerHTML = `<div style="background:linear-gradient(135deg,#1e0d3c,#3d1278);border:2px solid #e040fb;border-radius:22px;padding:30px 24px;width:290px;text-align:center;color:#fff;box-shadow:0 0 40px rgba(224,64,251,0.5);">
+    <div style="font-size:40px;margin-bottom:8px;">🎉</div>
+    <div style="font-size:17px;font-weight:bold;color:#ffd6f0;margin-bottom:8px;">ぴぴモード解放！</div>
+    <div style="font-size:13px;color:#e0d0ff;line-height:1.9;margin-bottom:18px;">
+      🌸 3級 <strong style="color:#FFE066;">64色</strong><br>
+      ✨ 2級 <strong style="color:#FFE066;">63色</strong><br>
+      👑 1級 <strong style="color:#FFB800;">127色（3級＋2級）</strong><br>
+      タイトルでレベルを選んで挑戦✨
+    </div>
+    <button id="pipi-ok" style="background:linear-gradient(135deg,#e040fb,#7c4dff);color:#fff;border:none;border-radius:20px;padding:11px 36px;font-size:15px;font-weight:bold;cursor:pointer;font-family:inherit;">はじめる！</button>
+  </div>`;
+  document.body.appendChild(ov2);
+  ov2.querySelector('#pipi-ok').addEventListener('click', ()=>document.body.removeChild(ov2));
+}
+
+function makeCharBtn(id,label,drawFn){
+  const btn=document.createElement('button');
+  btn.className='cbtn'+(id===curChar?' on':'');
+  btn.id='cb-'+id;
+  const c=document.createElement('canvas');c.width=48;c.height=48;
+  const cx2=c.getContext('2d');drawFn(cx2,24,24,48);
+  btn.appendChild(c);
+  const sp=document.createElement('span');sp.textContent=label;btn.appendChild(sp);
+  btn.addEventListener('click',()=>{
+    if(id==='pipi'){ 
+      if(isPaidMode){ 
+        // 既に解放済みなら普通にキャラ変更
+        curChar=id;
+        document.querySelectorAll('.cbtn').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on');
+        drawLives(); updateSkillUI();
+      } else {
+        showPipiNotice(); 
+      }
+      return; 
+    }
+    curChar=id;
+    document.querySelectorAll('.cbtn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    drawLives(); updateSkillUI();
+  });
+  return btn;
+}
+
+function el(tag,props,text){const e=document.createElement(tag);if(props)Object.entries(props).forEach(([k,v])=>{if(k==='style')Object.assign(e.style,v);else e[k]=v;});if(text)e.textContent=text;return e;}
+
+function showOverlay(type){
+  const ov=document.getElementById('overlay');
+  const oc=document.getElementById('oc');
+  ov.style.display='flex';
+  oc.innerHTML='';
+
+  if(type==='title'){
+    oc.appendChild(el('div',{style:{fontSize:'13px',color:'#ffd6f0',marginBottom:'3px',fontWeight:'bold',letterSpacing:'2px'}},'YUKA\'s Color Studio'));
+    const noteLink=el('a',{href:'https://note.com/color_studio',target:'_blank',style:{fontSize:'10px',color:'#9b8ec4',textDecoration:'none',display:'block',marginBottom:'6px'}});
+    noteLink.textContent='📝 note で色彩を学ぶ →';
+    oc.appendChild(noteLink);
+    const h=el('h1',{style:{marginBottom:'5px'}});h.textContent='🎨 いろまと！';oc.appendChild(h);
+    const p=el('p');p.innerHTML='慣用色名シューティング<br>お題の色名を撃ち落とせ✨<br>ちがう色を撃つとライフ減少💦<br><span style="font-size:11px;color:#a89bcf;">スコアでLvが自動上昇🔥</span>';oc.appendChild(p);
+    oc.appendChild(el('p',{style:{fontSize:'11px',color:'#9b8ec4',marginBottom:'7px'}},'キャラを選んでね：'));
+
+    const cs=el('div',{id:'char-sel',style:{display:'flex',gap:'16px',justifyContent:'center',marginBottom:'12px'}});
+    cs.appendChild(makeCharBtn('sakura','さくら',drawSakura));
+    const pipiLabel = isPaidMode ? 'ぴぴ ★' : 'ぴぴ 🔒';
+    const pipiBtn=makeCharBtn('pipi',pipiLabel,drawChocolat);
+    cs.appendChild(pipiBtn);
+    oc.appendChild(cs);
+
+    // レベル選択ボタン
+    oc.appendChild(el('p',{style:{fontSize:'11px',color:'#9b8ec4',marginBottom:'6px',textAlign:'center'}},'レベルを選んでね：'));
+    const lvWrap = el('div',{style:{display:'flex',gap:'7px',justifyContent:'center',marginBottom:'14px',flexWrap:'wrap'}});
+    const lvOptions = [
+      {lv:'3級', colors:64,  col:'#2ecc71'},
+      {lv:'2級', colors:63,  col:'#e040fb'},
+      {lv:'1級', colors:127, col:'#FFB800'},
+    ];
+    lvOptions.forEach(opt=>{
+      const b = el('button');
+      const isActive = opt.lv===selLevel;
+      b.style.cssText = `background:${isActive?`linear-gradient(135deg,${opt.col},#7c4dff)`:'rgba(255,255,255,.1)'};border:2px solid ${isActive?'transparent':'rgba(255,255,255,.2)'};border-radius:20px;color:#fff;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit;`;
+      b.innerHTML = `${opt.lv}<br><span style="font-size:10px;color:#FFE066;">${opt.colors}色</span>`;
+      b.addEventListener('click',()=>{
+        selLevel = opt.lv;
+        document.getElementById('level-badge').textContent = opt.lv+'★';
+        lvWrap.querySelectorAll('button').forEach((bb,i)=>{
+          const o = lvOptions[i];
+          bb.style.background = o.lv===selLevel?`linear-gradient(135deg,${o.col},#7c4dff)`:'rgba(255,255,255,.1)';
+          bb.style.borderColor = o.lv===selLevel?'transparent':'rgba(255,255,255,.2)';
+        });
+      });
+      lvWrap.appendChild(b);
+    });
+    oc.appendChild(lvWrap);
+
+    // ===== 進捗ゲージ =====
+    const progressWrap = el('div',{style:{marginBottom:'12px',width:'100%'}});
+    const progressTitle = el('div',{style:{fontSize:'11px',color:'#c9b8ff',marginBottom:'6px',textAlign:'center',fontWeight:'bold'}});
+    progressTitle.textContent='📊 撃ち落とし進捗';
+    progressWrap.appendChild(progressTitle);
+
+    // 各級の定義
+    const gradeConfig = [
+      {grade:'3級', total: isPaidMode?64:20, col:'#2ecc71', locked:false},
+      {grade:'2級', total:63,  col:'#e040fb', locked:!isPaidMode},
+      {grade:'1級', total:127, col:'#FFB800', locked:!isPaidMode},
+    ];
+    gradeConfig.forEach(gc2=>{
+      const count = gc2.locked ? 0 : getProgressCount(gc2.grade);
+      const total = gc2.total;
+      const pct = gc2.locked ? 0 : Math.round(count/total*100);
+      const row = el('div',{style:{marginBottom:'6px'}});
+
+      // ラベル行
+      const labelRow = el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'3px'}});
+      const lbl = el('span',{style:{fontSize:'11px',color: gc2.locked?'rgba(255,255,255,0.3)':'#fff',fontWeight:'bold'}});
+      lbl.textContent = gc2.locked ? `${gc2.grade} 🔒` : gc2.grade;
+      const cnt = el('span',{style:{fontSize:'11px',color: gc2.locked?'rgba(255,255,255,0.2)':'#FFE066',fontWeight:'bold'}});
+      cnt.textContent = gc2.locked ? '---' : `${count}/${total}色 (${pct}%)`;
+      labelRow.appendChild(lbl); labelRow.appendChild(cnt);
+      row.appendChild(labelRow);
+
+      // ゲージバー
+      const barBg = el('div',{style:{background:'rgba(255,255,255,0.1)',borderRadius:'6px',height:'8px',overflow:'hidden'}});
+      const barFill = el('div',{style:{
+        height:'100%',
+        width: gc2.locked ? '0%' : pct+'%',
+        background: gc2.locked ? 'rgba(255,255,255,0.1)' : `linear-gradient(90deg,${gc2.col},${gc2.col}aa)`,
+        borderRadius:'6px',
+        transition:'width 0.6s ease',
+        boxShadow: gc2.locked ? 'none' : `0 0 6px ${gc2.col}80`,
+      }});
+      barBg.appendChild(barFill);
+      row.appendChild(barBg);
+
+      // リセットボタン（有料版・撃ち落とし済みがある場合）
+      if(!gc2.locked && count > 0){
+        const resetBtn = el('div',{style:{textAlign:'left',marginTop:'4px'}});
+        const rb2 = el('button',{style:{background:'rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.25)',borderRadius:'12px',color:'rgba(255,255,255,0.6)',fontSize:'11px',cursor:'pointer',fontFamily:'inherit',padding:'4px 12px'}});
+        rb2.textContent='↺ リセット';
+        let resetConfirm = false;
+        rb2.addEventListener('click',()=>{
+          if(!resetConfirm){
+            resetConfirm = true;
+            rb2.textContent='本当にリセット？ もう一度タップ';
+            rb2.style.color='#FF8080';
+            rb2.style.borderColor='rgba(255,100,100,0.4)';
+            setTimeout(()=>{ resetConfirm=false; rb2.textContent='↺ リセット'; rb2.style.color='rgba(255,255,255,0.6)'; rb2.style.borderColor='rgba(255,255,255,0.25)'; }, 3000);
+          } else {
+            clearProgress(gc2.grade);
+            showOverlay('title');
+          }
+        });
+        resetBtn.appendChild(rb2);
+        row.appendChild(resetBtn);
+      }
+      progressWrap.appendChild(row);
+    });
+    oc.appendChild(progressWrap);
+
+    // ===== 未習得モードトグル（有料版のみ） =====
+    if(isPaidMode){
+      const unkWrap = el('div',{style:{
+        background: unknownOnlyMode ? 'rgba(255,184,0,0.15)' : 'rgba(255,255,255,0.05)',
+        border: `1.5px solid ${unknownOnlyMode ? 'rgba(255,184,0,0.5)' : 'rgba(255,255,255,0.12)'}`,
+        borderRadius:'14px', padding:'10px 14px', marginBottom:'12px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        cursor:'pointer',
+      }});
+      const unkLabel = el('div');
+      unkLabel.innerHTML = `<div style="font-size:12px;font-weight:bold;color:${unknownOnlyMode?'#FFE066':'#c9b8ff'};">🎯 未習得のみモード</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">まだ撃ち落としていない色だけ出現</div>`;
+      const toggle = el('div',{style:{
+        width:'40px', height:'22px',
+        background: unknownOnlyMode ? '#FFB800' : 'rgba(255,255,255,0.2)',
+        borderRadius:'11px', position:'relative', transition:'background 0.3s', flexShrink:'0',
+      }});
+      const knob = el('div',{style:{
+        width:'18px', height:'18px',
+        background:'#fff', borderRadius:'50%',
+        position:'absolute', top:'2px',
+        left: unknownOnlyMode ? '20px' : '2px',
+        transition:'left 0.3s',
+        boxShadow:'0 1px 4px rgba(0,0,0,0.3)',
+      }});
+      toggle.appendChild(knob);
+      unkWrap.appendChild(unkLabel);
+      unkWrap.appendChild(toggle);
+      unkWrap.addEventListener('click',()=>{
+        unknownOnlyMode = !unknownOnlyMode;
+        toggle.style.background = unknownOnlyMode ? '#FFB800' : 'rgba(255,255,255,0.2)';
+        knob.style.left = unknownOnlyMode ? '20px' : '2px';
+        unkWrap.style.background = unknownOnlyMode ? 'rgba(255,184,0,0.15)' : 'rgba(255,255,255,0.05)';
+        unkWrap.style.border = `1.5px solid ${unknownOnlyMode ? 'rgba(255,184,0,0.5)' : 'rgba(255,255,255,0.12)'}`;
+        unkLabel.innerHTML = `<div style="font-size:12px;font-weight:bold;color:${unknownOnlyMode?'#FFE066':'#c9b8ff'};">🎯 未習得のみモード</div><div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">まだ撃ち落としていない色だけ出現</div>`;
+      });
+      oc.appendChild(unkWrap);
+    }
+
+    const HOWTO_KEY = 'iromato_howto_seen';
+    const hasSeenHowto = localStorage.getItem(HOWTO_KEY);
+    const sb=el('button',{className:'btn'});sb.textContent='🎮 START';sb.addEventListener('click',()=>{
+      if(!hasSeenHowto){ localStorage.setItem(HOWTO_KEY,'1'); showOverlay('howto'); }
+      else { startGame(); }
+    });oc.appendChild(sb);
+    const hb=el('button',{className:'btn sec'});hb.textContent='🕹️ あそびかたを見る';hb.addEventListener('click',()=>showOverlay('howto'));oc.appendChild(hb);
+  }
+
+  if(type==='howto'){
+    oc.innerHTML='';
+    oc.appendChild(el('div',{style:{fontSize:'15px',color:'#ffd6f0',marginBottom:'14px',fontWeight:'bold',textAlign:'center'}},'🕹️ あそびかた'));
+
+    // ステップ1：お題を確認
+    const s1=el('div',{style:{background:'rgba(255,255,255,0.07)',borderRadius:'14px',padding:'12px',marginBottom:'10px'}});
+    const c1=document.createElement('canvas');c1.width=280;c1.height=60;
+    const x1=c1.getContext('2d');
+    // ターゲットバー風
+    x1.fillStyle='rgba(255,255,255,0.1)';
+    x1.beginPath();x1.roundRect(10,14,260,36,10);x1.fill();
+    x1.fillStyle='#E8637B';
+    x1.beginPath();x1.arc(36,32,11,0,Math.PI*2);x1.fill();
+    x1.fillStyle='#fff';x1.font='bold 15px Hiragino Maru Gothic Pro,sans-serif';x1.textAlign='left';x1.textBaseline='middle';
+    x1.fillText('こうばい色',56,32);
+    x1.fillStyle='#FFE066';x1.font='bold 11px Hiragino Maru Gothic Pro,sans-serif';x1.textAlign='right';
+    x1.fillText('← まずここを見る！',270,32);
+    s1.innerHTML='<div style="font-size:12px;color:#c9b8ff;margin-bottom:6px;font-weight:bold;">① 下のバーでお題の色名をチェック</div>';
+    s1.appendChild(c1);
+    oc.appendChild(s1);
+
+    // ステップ2：スライドでうさぎを動かしてタップ
+    const s2=el('div',{style:{background:'rgba(255,255,255,0.07)',borderRadius:'14px',padding:'12px',marginBottom:'10px',textAlign:'center'}});
+    s2.innerHTML='<div style="font-size:12px;color:#c9b8ff;margin-bottom:8px;font-weight:bold;">② スライドでうさぎを動かして、タップで発射！</div>';
+    const c2=document.createElement('canvas');c2.width=280;c2.height=96;c2.style.display='block';c2.style.margin='0 auto';
+    const x2=c2.getContext('2d');
+    // うさぎ（左寄り）
+    drawSakura(x2,70,80,52);
+    // スライド矢印
+    x2.strokeStyle='rgba(255,224,102,0.8)';x2.lineWidth=2.5;x2.lineCap='round';
+    x2.beginPath();x2.moveTo(96,72);x2.lineTo(160,72);x2.stroke();
+    // 矢印先端
+    x2.fillStyle='#FFE066';
+    x2.beginPath();x2.moveTo(168,72);x2.lineTo(156,66);x2.lineTo(156,78);x2.closePath();x2.fill();
+    // 指スライドアイコン
+    x2.font='20px sans-serif';x2.textAlign='center';x2.textBaseline='middle';
+    x2.fillText('👉',118,58);
+    x2.font='10px Hiragino Maru Gothic Pro,sans-serif';x2.fillStyle='rgba(255,224,102,0.8)';
+    x2.fillText('スライドで移動',118,42);
+    // うさぎ（右寄り・移動後）
+    x2.globalAlpha=0.4;
+    drawSakura(x2,195,80,52);
+    x2.globalAlpha=1;
+    // タップ→弾
+    x2.fillStyle='#F4A7B9';x2.shadowBlur=6;x2.shadowColor='#e040fb';
+    x2.beginPath();x2.arc(205,44,6,0,Math.PI*2);x2.fill();
+    x2.beginPath();x2.arc(218,28,5,0,Math.PI*2);x2.fill();
+    x2.shadowBlur=0;
+    x2.font='10px Hiragino Maru Gothic Pro,sans-serif';x2.fillStyle='#F4A7B9';x2.textAlign='center';
+    x2.fillText('タップで発射💕',210,14);
+    s2.appendChild(c2);
+    oc.appendChild(s2);
+
+    // ステップ3：同じ色名に当てる
+    const s3=el('div',{style:{background:'rgba(255,255,255,0.07)',borderRadius:'14px',padding:'12px',marginBottom:'16px'}});
+    const c3=document.createElement('canvas');c3.width=280;c3.height=56;
+    const x3=c3.getContext('2d');
+    // 正解ブロック
+    x3.fillStyle='#E8637B';
+    x3.beginPath();x3.roundRect(8,12,110,32,10);x3.fill();
+    x3.fillStyle='#fff';x3.font='bold 13px Hiragino Maru Gothic Pro,sans-serif';x3.textAlign='center';x3.textBaseline='middle';
+    x3.fillText('こうばい色',63,28);
+    x3.fillStyle='#88FF88';x3.font='bold 18px sans-serif';x3.fillText('✅',142,28);
+    x3.fillStyle='#88FF88';x3.font='bold 12px Hiragino Maru Gothic Pro,sans-serif';x3.textAlign='left';
+    x3.fillText('+10点！',162,28);
+    // 違う色ブロック
+    x3.fillStyle='rgba(255,100,100,0.3)';
+    x3.beginPath();x3.roundRect(8,12,110,32,10);
+    // ちがう色例
+    x3.fillStyle='rgba(255,80,80,0.15)';
+    x3.beginPath();x3.roundRect(8,42,110,12,4);x3.fill();
+    x3.fillStyle='rgba(255,136,170,0.6)';x3.font='10px Hiragino Maru Gothic Pro,sans-serif';x3.textAlign='left';
+    x3.fillText('ちがう色→触らない💦',122,49);
+    s3.innerHTML='<div style="font-size:12px;color:#c9b8ff;margin-bottom:6px;font-weight:bold;">③ お題と同じ色名ブロックに命中で得点！</div>';
+    s3.appendChild(c3);
+    oc.appendChild(s3);
+
+    // ステップ4：ぴぴ選択時のみにんじん説明
+    if(curChar==='pipi'){
+      const s4=el('div',{style:{background:'rgba(255,140,0,0.12)',border:'1.5px solid rgba(255,140,0,0.4)',borderRadius:'14px',padding:'14px',marginBottom:'10px',textAlign:'center'}});
+      const t4=el('div',{style:{fontSize:'12px',color:'#FFC066',marginBottom:'10px',fontWeight:'bold'}});
+      t4.textContent='🥕 ぴぴ専用！にんじんシステム';
+      s4.appendChild(t4);
+      // にんじん3本→ライフ説明（絵文字で）
+      const row=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',marginBottom:'10px',fontSize:'22px'}});
+      row.innerHTML='🥕 ＋ 🥕 ＋ 🥕 <span style="font-size:16px;color:#FFE066;margin:0 4px;">→</span> ❤️<span style="font-size:13px;color:#FFE066;font-weight:bold;"> +1！</span>';
+      s4.appendChild(row);
+      const desc=el('div',{style:{fontSize:'11px',color:'#FFC066',lineHeight:'1.8'}});
+      desc.innerHTML='時々落ちてくる🥕を弾で撃って集めよう！<br><strong style="color:#FFE066;">3本でライフが1つ増える！</strong><br>でも速いから注意⚡';
+      s4.appendChild(desc);
+      oc.appendChild(s4);
+    }
+
+    const gb=el('button',{className:'btn',style:{width:'100%'}});
+    gb.textContent='🎮 わかった！はじめる';
+    gb.addEventListener('click',startGame);
+    oc.appendChild(gb);
+  }
+
+  if(type==='gameover'){
+    const grade=score>=900?'S':score>=500?'A':score>=250?'B':'C';
+    const msg={S:'カラーマスター！🏆',A:'すごい！✨',B:'いい感じ！🌸',C:'もう一回！💪'}[grade];
+    const d=getDiff(score);
+
+    // キャラ
+    const cc=document.createElement('canvas');cc.width=70;cc.height=70;
+    (curChar==='sakura'?drawSakura:drawChocolat)(cc.getContext('2d'),35,35,70);
+    cc.style.marginBottom='6px'; oc.appendChild(cc);
+
+    // スコア・グレード
+    const h1=el('h1');h1.textContent='GAME OVER'; oc.appendChild(h1);
+    const sc=el('div',{style:{fontSize:'34px',fontWeight:'bold',color:'#ffd6f0',margin:'6px 0'}});sc.textContent=score+' pt'; oc.appendChild(sc);
+    const dv=el('div',{style:{fontSize:'12px',color:'#c9b8ff',marginBottom:'4px'}});dv.textContent='最高到達 '+d.label; oc.appendChild(dv);
+    const gd=el('div',{style:{fontSize:'13px',color:'#a89bcf',marginBottom:'10px'}});
+    gd.innerHTML=`グレード：<strong style="color:#FFE066;font-size:18px;">${grade}</strong>　${msg}`; oc.appendChild(gd);
+
+    // 撃ち落とした色一覧
+    if(hitColors.length>0){
+      const ht=el('div',{style:{fontSize:'11px',color:'#c9b8ff',marginBottom:'6px',fontWeight:'bold'}});
+      ht.textContent=`🎯 撃ち落とした色（${hitColors.length}色）`; oc.appendChild(ht);
+      const clist=el('div',{style:{display:'flex',flexWrap:'wrap',gap:'5px',justifyContent:'center',marginBottom:'14px',padding:'4px'}});
+      hitColors.forEach(h=>{
+        const chip=el('div',{style:{display:'flex',alignItems:'center',gap:'4px',background:'rgba(255,255,255,0.1)',borderRadius:'20px',padding:'3px 9px 3px 5px'}});
+        const dot=el('span',{style:{display:'inline-block',width:'12px',height:'12px',borderRadius:'50%',background:h.hex,border:'1px solid rgba(255,255,255,0.3)',flexShrink:'0'}});
+        const nm=el('span',{style:{fontSize:'12px',color:'#fff',fontWeight:'bold'}});nm.textContent=h.kanji||h.name;
+        chip.appendChild(dot); chip.appendChild(nm); clist.appendChild(chip);
+      });
+      oc.appendChild(clist);
+    }
+
+    const rb=document.createElement('button');rb.className='btn';rb.textContent='🔄 もう一度';rb.addEventListener('click',startGame);oc.appendChild(rb);
+    const tb=document.createElement('button');tb.className='btn sec';tb.textContent='タイトルへ';tb.addEventListener('click',()=>{state='title';showOverlay('title');});oc.appendChild(tb);
+
+    // note誘導バナー（もっとタップしたくなるデザイン）
+    const banner=el('a',{
+      href:'https://note.com/color_studio/n/ndc8619ba760b',
+      target:'_blank',
+      style:{
+        display:'block', marginTop:'14px', textDecoration:'none',
+        background:'linear-gradient(135deg,#3d1278,#7c4dff,#e040fb)',
+        borderRadius:'18px', padding:'2px', cursor:'pointer',
+      }
+    });
+    const bannerInner=el('div',{style:{
+      background:'linear-gradient(135deg,#1a0a2e,#2d1060)',
+      borderRadius:'16px', padding:'14px 16px',
+    }});
+    // さくらうさぎcanvas
+    const bnrC=document.createElement('canvas');bnrC.width=54;bnrC.height=54;
+    drawSakura(bnrC.getContext('2d'),27,30,54);
+    bnrC.style.cssText='flex-shrink:0;filter:drop-shadow(0 0 6px #e040fb);';
+    const bnrTop=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'8px'}});
+    bnrTop.innerHTML=`<span style="font-size:10px;color:#c9b8ff;letter-spacing:1px;font-weight:bold;">YUKA's Color Studio</span><span style="font-size:10px;background:linear-gradient(90deg,#e040fb,#7c4dff);color:#fff;padding:2px 8px;border-radius:10px;font-weight:bold;">無料で見る</span>`;
+    const bnrMid=el('div',{style:{display:'flex',alignItems:'center',gap:'12px'}});
+    bnrMid.appendChild(bnrC);
+    const bnrTxt=el('div');
+    bnrTxt.innerHTML=`<div style="font-size:14px;font-weight:bold;color:#fff;margin-bottom:3px;line-height:1.4;">色彩検定2級を<br>もっと深く学ぶなら</div><div style="font-size:11px;color:#c9b8ff;line-height:1.5;">📖フラッシュカード　🎨トーン分類<br>📐マンセル　🎯スライダーで楽しく学習！</div>`;
+    bnrMid.appendChild(bnrTxt);
+    const bnrBtn=el('div',{style:{marginTop:'10px',background:'linear-gradient(90deg,#e040fb,#7c4dff)',borderRadius:'10px',padding:'8px',textAlign:'center'}});
+    bnrBtn.innerHTML=`<span style="color:#fff;font-size:13px;font-weight:bold;">👉 カラーマスター2級アプリを見てみる</span>`;
+    bannerInner.appendChild(bnrTop);
+    bannerInner.appendChild(bnrMid);
+    bannerInner.appendChild(bnrBtn);
+    banner.appendChild(bannerInner);
+    oc.appendChild(banner);
+  }
+}
+
+// ===== PROGRESS SYSTEM =====
+// localStorage に級別の撃ち落とし済み色名を永続保存
+const PROGRESS_KEY = 'iromato_progress_v1';
+
+function loadProgress() {
+  try {
+    return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+  } catch(e) { return {}; }
+}
+function saveProgress(grade, names) {
+  try {
+    const p = loadProgress();
+    if (!p[grade]) p[grade] = [];
+    names.forEach(n => { if (!p[grade].includes(n)) p[grade].push(n); });
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+  } catch(e) {}
+}
+function getProgressCount(grade) {
+  const p = loadProgress();
+  return (p[grade] || []).length;
+}
+function getLearnedSet(grade) {
+  const p = loadProgress();
+  return new Set(p[grade] || []);
+}
+function clearProgress(grade) {
+  try {
+    const p = loadProgress();
+    p[grade] = [];
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+  } catch(e) {}
+}
+
+// 未習得モードフラグ（有料版のみ）
+let unknownOnlyMode = false;
+
+function startGame(){
+  state='playing';score=0;lives=3;combo=0;
+  bullets=[];enemies=[];particles=[];
+  spawnT=0;spawnI=DIFFS[0].si;frameN=0;cooldown=0;curLv=1;prevLv=1;
+  pipiChar.x=W/2;pipiChar.tx=W/2;
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('score-val').textContent='0';
+  document.getElementById('diff-badge').textContent='Lv1';
+  document.getElementById('diff-badge').style.background='#2ecc71';
+  document.getElementById('level-badge').textContent=selLevel+'★';
+  document.getElementById('lvup').style.opacity='0';
+  shootLocked=true; skillGauge=0; skillActive=false; slowMode=false; skillTimer=0; hitColors=[];
+  flowerShower=false; flowerTimer=0; petals=[]; gameReady=false;
+  triviaMsg=null; triviaT=0; triviaColor=null; triviaName=null;
+  carrots=[]; carrotCount=0; carrotSpawnTimer=0;
+  const chud=document.getElementById('carrot-hud');
+  if(chud){ chud.style.display=curChar==='pipi'?'inline':'none'; chud.textContent='○○○'; }
+  drawLives(); buildPool(); pickTarget(); updateSkillUI();
+  try{getAC().resume();}catch(e){}
+}
+function endGame(){
+  state='gameover';
+  // 進捗保存：撃ち落とした色を記録
+  if(hitColors.length > 0){
+    const grade = isPaidMode ? selLevel : '3級';
+    saveProgress(grade, hitColors.map(h=>h.name));
+  }
+  showOverlay('gameover');
+}
+
+// ===== INPUT =====
+window.addEventListener('touchend',()=>{shootLocked=false;});
+window.addEventListener('mouseup',()=>{shootLocked=false;});
+
+gc.addEventListener('mousemove',e=>{if(state!=='playing')return;const r=gc.getBoundingClientRect();pipiChar.tx=(e.clientX-r.left)*(W/r.width);});
+gc.addEventListener('click',e=>{
+  const r=gc.getBoundingClientRect();pipiChar.tx=(e.clientX-r.left)*(W/r.width);
+  shoot(); // 常に射撃。スキルはスキルボタンで発動
+});
+gc.addEventListener('touchstart',e=>{
+  e.preventDefault();const r=gc.getBoundingClientRect();pipiChar.tx=(e.touches[0].clientX-r.left)*(W/r.width);
+  shoot();
+  try{getAC().resume();}catch(e2){}
+},{passive:false});
+gc.addEventListener('touchmove',e=>{e.preventDefault();const r=gc.getBoundingClientRect();pipiChar.tx=(e.touches[0].clientX-r.left)*(W/r.width);},{passive:false});
+
+document.getElementById('sound-btn').addEventListener('click',()=>{soundOn=!soundOn;document.getElementById('sound-btn').textContent=soundOn?'🔊':'🔇';try{getAC().resume();}catch(e){}});
+
+// ===== LOOP =====
+function loop(){update();render();requestAnimationFrame(loop);}
+pipiChar.tx=W/2;
+showOverlay('title');
+loop();
+</script>
+</body>
+</html>
